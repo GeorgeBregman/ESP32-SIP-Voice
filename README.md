@@ -1,7 +1,6 @@
 # ESP32-SIP-Voice
 ESP32-based SIP VoIP client (ESP-IDF + FreeRTOS). Tasks, queues, and core SIP call flow logic. Uses G.711 µ-law and I2S codec (e.g., ES8388).
 
-Assumptions:
 ESP-IDF v4.4 or later is used.
 An external I2S audio codec like ES8388 is targeted (requiring a specific driver). We'll use placeholder function calls.
 G.711 µ-law (PCMU) is the primary codec (Payload Type 0).
