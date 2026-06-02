@@ -65,5 +65,9 @@ While this project implements a solid baseline for a SIP client, here are areas 
 *   **Power Optimization:** For battery-powered operation, explore ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration.
 *   **Advanced Call Features:** Support for multiple concurrent calls (call waiting), call transfer (REFER), and putting calls on hold.
 
+## Version History
+* **v1.1.0** - Refactored project architecture: Full SIP State Machine with MD5 auth, STUN implementation, Jitter Buffer / PLC for RTP, Dual Codec support (ES8388 & I2S), and modular UI controller (Buttons/Web/Auto-answer).
+* **v1.0.0** - Initial base template with placeholder functions and basic Wi-Fi connectivity.
+
 ## License
 MIT License
