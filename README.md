@@ -54,20 +54,24 @@ esp32_sip_client/
    idf.py -p (YOUR_PORT) flash monitor
    ```
 
-## Next Steps & Important Considerations
+## Next Steps & Important Considerations (TO DO)
 
-While this project implements a solid baseline for a SIP client, here are areas for future expansion depending on your production requirements:
-
-*   **Security (SIPS & SRTP):** For production environments over the open internet, signaling should be encrypted via TLS (SIPS), and the audio stream should be encrypted using SRTP.
-*   **Advanced Audio Processing (AEC & NS):** If using a speakerphone setup (microphone and speaker in the same room), Acoustic Echo Cancellation (AEC) and Noise Suppression (NS) are critical to prevent feedback loops. ESP-ADF provides libraries for this.
-*   **Dynamic Codec Negotiation:** The SDP logic currently defaults to G.711 µ-law. Expanding the SDP parser to negotiate other codecs (like G.722 for HD Voice or OPUS) would make the client more versatile.
-*   **ICE & TURN for Complex NATs:** The basic STUN implementation is great for most home networks, but symmetric NATs may require a TURN server to relay media. Implementing ICE (Interactive Connectivity Establishment) would provide bulletproof NAT traversal.
-*   **Power Optimization:** For battery-powered operation, explore ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration.
-*   **Advanced Call Features:** Support for multiple concurrent calls (call waiting), call transfer (REFER), and putting calls on hold.
+*   **SRTP (Secure RTP):** Full encryption of the audio stream using SRTP is required for complete privacy. This is currently deferred until the official ESP-ADF framework integration.
+*   **SIPS (TLS) Completion:** The foundation for SIP over TLS (esp_tls_t) has been conditionally added (USE_SIPS), but requires proper certificate provisioning and server-side testing to fully implement secure SIP signaling.
+*   **Full-Duplex AEC (Acoustic Echo Cancellation):** We have implemented half-duplex Echo Suppression (speaker attenuation), which is perfect for the ESP32-C3. For true full-duplex AEC (simultaneous speaking), integration with DSP libraries (like ESP-ADF) is required.
+*   **Dynamic Codec Negotiation:** Expanding the SDP parser to parse 
+tpmap dynamically and negotiate codecs like G.722 (HD Voice) or OPUS, rather than defaulting to G.711 µ-law.
+*   **Hardware Validation:** Testing the I2C OLED (SSD1306), Captive Portal, and I2S codecs together on a physical prototype or custom PCB.
+*   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
+* **v1.2.0** - Added Captive Portal (Web Setup via AP mode), Half-duplex Acoustic Echo Suppression for ESP32-C3, OLED Display support (SSD1306 via I2C), and structural SIPS (TLS) integration.
 * **v1.1.0** - Refactored project architecture: Full SIP State Machine with MD5 auth, STUN implementation, Jitter Buffer / PLC for RTP, Dual Codec support (ES8388 & I2S), and modular UI controller (Buttons/Web/Auto-answer).
 * **v1.0.0** - Initial base template with placeholder functions and basic Wi-Fi connectivity.
 
 ## License
 MIT License
+
+## Contact
+
+For questions or support, visit [George Bregman's Website](https://georgebregman.com/).

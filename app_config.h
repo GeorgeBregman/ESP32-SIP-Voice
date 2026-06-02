@@ -16,6 +16,8 @@
 #define SIP_LOCAL_PORT         5060            // Local port for SIP UDP socket
 #define SIP_REGISTRATION_EXPIRY 3600           // Registration duration in seconds
 #define SIP_RETRY_INTERVAL_MS  5000            // Interval to retry registration on failure
+#define USE_SIPS 0 // Set to 1 to enable SIP over TLS (SIPS)
+
 #define SIP_TARGET_URI         "sip:1001@192.168.1.100" // Target URI to call
 
 // --- RTP Configuration ---

@@ -212,7 +212,30 @@ static void audio_io_task(void* pvParameters) {
                     // pipeline->encoded_buffer[i] = linear16_to_ulaw(sample); // Need conversion func
                     pipeline->encoded_buffer[i] = pipeline->i2s_read_buffer[i]; // Placeholder: direct copy if I2S gives 8-bit ulaw? Unlikely.
                 }
+
+                // --- Acoustic Echo Suppression (Half-duplex fallback) ---
+                // Calculate speaker energy from the last decoded frame
+                int32_t spk_energy = 0;
+                int16_t *spk_ptr = (int16_t *)pipeline->decoded_buffer;
+                int num_samples = AUDIO_SAMPLES_PER_FRAME / 2;
+                for (int i = 0; i < num_samples; i++) {
+                    int val = spk_ptr[i];
+                    if (val < 0) val = -val;
+                    spk_energy += val;
+                }
+                spk_energy /= num_samples;
+
+                // Attenuate microphone if speaker is active
+                if (spk_energy > 150) { // Threshold
+                    int16_t *mic_ptr = (int16_t *)pipeline->i2s_read_buffer;
+                    for (int i = 0; i < num_samples; i++) {
+                        mic_ptr[i] = mic_ptr[i] / 16; // Attenuate heavily (-24dB)
+                    }
+                }
+                // --------------------------------------------------------
+
                 g711_encode(pipeline->encoded_buffer, pipeline->i2s_read_buffer, AUDIO_SAMPLES_PER_FRAME, G711_ULAW); // Correct way
+
 
 
                 // Send RTP Packet (if destination is known)

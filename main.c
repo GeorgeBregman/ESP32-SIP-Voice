@@ -11,6 +11,8 @@
 #include "audio_pipeline.h"
 #include "app_config.h" // Include configurations
 #include "ui_controller.h" // Include UI Controller
+#include "config_manager.h"
+#include "display.h"
 
 static const char *TAG = "MAIN";
 
@@ -23,6 +25,7 @@ EventGroupHandle_t app_event_group;
 // Shared handles (if needed across modules, though better passed as params)
 sip_client_handle_t g_sip_client = NULL;
 audio_pipeline_handle_t g_audio_pipeline = NULL;
+app_settings_t g_app_settings;
 
 // --- Application State Machine (Simplified Example) ---
 typedef enum {
@@ -75,13 +78,13 @@ void app_control_task(void *pvParameters) {
 void app_main(void) {
     ESP_LOGI(TAG, "Starting ESP32 SIP Client Application");
 
-    // Initialize NVS Flash
-    esp_err_t ret = nvs_flash_init();
-    if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-      ESP_ERROR_CHECK(nvs_flash_erase());
-      ret = nvs_flash_init();
-    }
-    ESP_ERROR_CHECK(ret);
+    // Initialize NVS Flash & Load Config
+    config_manager_init();
+    config_manager_load(&g_app_settings);
+    
+    // Initialize Display
+    display_init();
+    display_update_status("Starting...", "Init", "");
 
     // Create Event Group
     app_event_group = xEventGroupCreate();
@@ -94,8 +97,21 @@ void app_main(void) {
     ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    // Initialize Wi-Fi
-    wifi_init_sta(app_event_group, WIFI_CONNECTED_BIT, IP_ACQUIRED_BIT); // Pass event group
+    // Initialize Wi-Fi (will block or start AP if missing config)
+    wifi_init_sta(app_event_group, WIFI_CONNECTED_BIT, IP_ACQUIRED_BIT, &g_app_settings); 
+
+    if (wifi_is_ap_mode()) {
+        ESP_LOGI(TAG, "Running in AP Mode (Captive Portal). SIP disabled.");
+        display_update_status("192.168.4.1", "AP Setup Mode", "ESP-SIP-Setup");
+        ui_controller_init(NULL, &g_app_settings);
+        return; // Stop initialization here
+    }
+
+    esp_ip4_addr_t my_ip;
+    get_my_ip(&my_ip);
+    char ip_str[16];
+    snprintf(ip_str, sizeof(ip_str), IPSTR, IP2STR(&my_ip));
+    display_update_status(ip_str, "Connecting SIP...", "");
 
     // Initialize Audio Pipeline (I2S, Codec)
     // This needs the actual codec driver implementation
@@ -107,7 +123,7 @@ void app_main(void) {
 
     // Initialize SIP Client
     // Pass necessary handles/configs
-    g_sip_client = sip_client_init(app_event_group, SIP_REGISTERED_BIT, g_audio_pipeline);
+    g_sip_client = sip_client_init(app_event_group, SIP_REGISTERED_BIT, g_audio_pipeline, &g_app_settings);
      if (!g_sip_client) {
         ESP_LOGE(TAG, "Failed to initialize SIP client");
         // Handle error
@@ -120,7 +136,7 @@ void app_main(void) {
 
     // Initialize UI Controller
     if (g_sip_client) {
-        ui_controller_init(g_sip_client);
+        ui_controller_init(g_sip_client, &g_app_settings);
     }
 
     // Create application control task (optional, but good for managing overall state)

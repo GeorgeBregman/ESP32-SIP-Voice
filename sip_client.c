@@ -1,50 +1,3 @@
-// sip_client.h
-#ifndef SIP_CLIENT_H
-#define SIP_CLIENT_H
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/event_groups.h"
-#include "esp_err.h"
-#include "lwip/ip_addr.h"
-#include "audio_pipeline.h" // Include audio handle
-
-// Opaque handle for the SIP client instance
-typedef struct sip_client_s* sip_client_handle_t;
-
-// Callbacks for the application layer (optional)
-typedef struct {
-    void (*on_incoming_call)(const char* caller_uri, const char* call_id);
-    void (*on_call_answered)(const char* call_id);
-    void (*on_call_ended)(const char* call_id);
-    void (*on_registration_status)(bool registered);
-} sip_callbacks_t;
-
-// Call States (Simplified)
-typedef enum {
-    SIP_CALL_STATE_IDLE,
-    SIP_CALL_STATE_INVITING,   // Sent INVITE, waiting for response
-    SIP_CALL_STATE_INCOMING,   // Received INVITE, waiting for user action (answer/reject)
-    SIP_CALL_STATE_RINGING,    // Sent 180 Ringing
-    SIP_CALL_STATE_CONNECTING, // Received 200 OK for INVITE / Sent 200 OK for INVITE
-    SIP_CALL_STATE_ACTIVE,     // Call established (ACK sent/received)
-    SIP_CALL_STATE_TERMINATING,// BYE sent or received
-    SIP_CALL_STATE_ENDED
-} sip_call_state_t;
-
-
-// Function Prototypes
-sip_client_handle_t sip_client_init(EventGroupHandle_t app_event_group, EventBits_t registered_event_bit, audio_pipeline_handle_t audio_handle);
-esp_err_t sip_client_start_registration(sip_client_handle_t handle);
-esp_err_t sip_client_initiate_call(sip_client_handle_t handle, const char* target_uri);
-esp_err_t sip_client_answer_call(sip_client_handle_t handle);
-esp_err_t sip_client_terminate_call(sip_client_handle_t handle); // Hang up active/incoming call
-esp_err_t sip_client_register_callbacks(sip_client_handle_t handle, const sip_callbacks_t* callbacks);
-sip_call_state_t sip_client_get_call_state(sip_client_handle_t handle);
-esp_err_t sip_client_get_remote_rtp_info(sip_client_handle_t handle, ip_addr_t* remote_ip, uint16_t* remote_port);
-uint16_t sip_client_get_local_rtp_port(sip_client_handle_t handle); // Function needed by audio pipeline
-
-#endif // SIP_CLIENT_H
-
 // sip_client.c - *** HIGHLY SIMPLIFIED - NEEDS FULL STATE MACHINE ***
 #include <string.h>
 #include "sip_client.h"
@@ -52,6 +5,9 @@ uint16_t sip_client_get_local_rtp_port(sip_client_handle_t handle); // Function 
 #include "esp_log.h"
 #include "esp_random.h"
 #include "lwip/sockets.h"
+#if USE_SIPS
+#include "esp_tls.h"
+#endif
 #include "lwip/dns.h"
 #include "freertos/timers.h"
 #include "wifi_manager.h" // For get_my_ip()
@@ -68,7 +24,11 @@ typedef struct sip_client_s {
     TimerHandle_t registration_timer;
     TaskHandle_t sip_task_handle;
 
+#if USE_SIPS
+    esp_tls_t *tls;
+#else
     int sip_socket;
+#endif
     struct sockaddr_in server_addr;
     struct sockaddr_in local_addr; // Our local address for SIP
     struct sockaddr_in remote_rtp_addr; // Remote peer's RTP address/port from SDP
@@ -154,7 +114,7 @@ static void compute_digest_response(const char *username, const char *password, 
 
 // --- Public Functions ---
 
-sip_client_handle_t sip_client_init(EventGroupHandle_t app_event_group, EventBits_t registered_event_bit, audio_pipeline_handle_t audio_handle) {
+sip_client_handle_t sip_client_init(EventGroupHandle_t app_event_group, EventBits_t registered_event_bit, audio_pipeline_handle_t audio_handle, app_settings_t *settings) {
     ESP_LOGI(TAG, "Initializing SIP Client...");
     sip_client_t *client = (sip_client_t *)calloc(1, sizeof(sip_client_t));
     if (!client) {
@@ -175,20 +135,20 @@ sip_client_handle_t sip_client_init(EventGroupHandle_t app_event_group, EventBit
     sprintf(client->reg_call_id, "%lx-%lx", esp_random(), esp_random());
 
     // Copy configuration
-    strncpy(client->user, SIP_USER, sizeof(client->user) - 1);
-    strncpy(client->password, SIP_PASSWORD, sizeof(client->password) - 1);
-    strncpy(client->domain, SIP_DOMAIN, sizeof(client->domain) - 1);
+    strncpy(client->user, client->settings->sip_user, sizeof(client->user) - 1);
+    strncpy(client->password, client->settings->sip_password, sizeof(client->password) - 1);
+    strncpy(client->domain, client->settings->sip_server, sizeof(client->domain) - 1);
     strncpy(client->display_name, SIP_DISPLAY_NAME, sizeof(client->display_name) - 1);
 
 
     // Resolve server address (basic DNS lookup)
     ip_addr_t target_addr;
-    err_t err = dns_gethostbyname(SIP_SERVER_IP, &target_addr, NULL, NULL); // Blocking! Consider async DNS.
+    err_t err = dns_gethostbyname(client->settings->sip_server, &target_addr, NULL, NULL); // Blocking! Consider async DNS.
     if (err != ERR_OK) {
-         ESP_LOGE(TAG, "DNS lookup failed for %s: %d", SIP_SERVER_IP, err);
-         // Handle error - maybe try IP directly if SIP_SERVER_IP is an IP string
+         ESP_LOGE(TAG, "DNS lookup failed for %s: %d", client->settings->sip_server, err);
+         // Handle error - maybe try IP directly if client->settings->sip_server is an IP string
          // For simplicity, trying direct IP conversion if DNS fails
-         if (!ipaddr_aton(SIP_SERVER_IP, &target_addr)) {
+         if (!ipaddr_aton(client->settings->sip_server, &target_addr)) {
              ESP_LOGE(TAG, "Failed to resolve server address.");
              free(client);
              return NULL;

@@ -8,8 +8,10 @@ idf_component_register(SRCS
                        "g711_codec.c"
                        "codec_driver.c"
                        "ui_controller.c"
+                       "config_manager.c"
+                       "display.c"
                        INCLUDE_DIRS "."
-                       REQUIRES lwip mbedtls # Add other required components like driver, freertos, esp_wifi, etc.
+                       REQUIRES lwip mbedtls nvs_flash esp_tls # Add other required components like driver, freertos, esp_wifi, etc.
                       )
 
 # If using ESP-ADF components for codec drivers, add them here:
