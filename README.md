@@ -19,13 +19,13 @@ This project provides a robust, production-ready foundation for VoIP intercommun
 
 ## Supported Environments & Versions
 
-While this project is designed to be highly portable across ESP-IDF versions and ESP32 hardware, the following environments are explicitly supported and tested (but not strictly limited to):
+While this project is designed to be highly portable across ESP-IDF versions and ESP32 hardware, the following environments are supported (but not strictly limited to):
 
 *   **ESP-IDF Versions**: v4.4, v5.0, v5.1+
 *   **Supported Hardware**: 
     *   ESP32 (Classic dual-core)
     *   ESP32-S2, ESP32-S3
-    *   ESP32-C3 (RISC-V single-core, tested with Half-Duplex AEC)
+    *   ESP32-C3 (RISC-V single-core, with Half-Duplex AEC)
 *   **Audio Codecs**: 
     *   I2S Breakouts (e.g., INMP441 Mic + MAX98357A DAC)
     *   I2C Codecs (e.g., ES8388, typically on AudioKit boards)
