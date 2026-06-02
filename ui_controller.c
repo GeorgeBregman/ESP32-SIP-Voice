@@ -74,31 +74,21 @@ static void url_decode(char *dst, const char *src) {
 }
 
 static esp_err_t index_get_handler(httpd_req_t *req) {
-    char resp_str[1024];
+    char *resp_str = calloc(1, 4096);
+    if (!resp_str) return ESP_FAIL;
+
     if (wifi_is_ap_mode()) {
-        snprintf(resp_str, sizeof(resp_str), 
-            "<html><body><h1>ESP32 SIP Setup (Captive Portal)</h1>"
-            "<form method='POST' action='/setup'>"
-            "WiFi SSID: <input type='text' name='ssid' value='%s'><br>"
-            "WiFi Pass: <input type='password' name='pass' value='%s'><br>"
-            "SIP Server: <input type='text' name='sip_server' value='%s'><br>"
-            "SIP User: <input type='text' name='sip_user' value='%s'><br>"
-            "SIP Pass: <input type='password' name='sip_pass' value='%s'><br>"
-            "<input type='submit' value='Save & Restart'>"
-            "</form></body></html>", 
+        snprintf(resp_str, 4096, 
+            "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>ESP32 SIP Setup</title><style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');body{margin:0;padding:0;font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);height:100vh;display:flex;justify-content:center;align-items:center;color:#fff;}.card{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:16px;padding:40px;box-shadow:0 8px 32px 0 rgba(0,0,0,0.37);border:1px solid rgba(255,255,255,0.18);width:100%%;max-width:320px;}h1{text-align:center;margin-top:0;font-size:24px;font-weight:600;letter-spacing:1px;}.form-group{margin-bottom:16px;}label{display:block;font-size:13px;margin-bottom:6px;color:#ccc;}input[type='text'],input[type='password']{width:100%%;padding:10px;border:none;border-radius:8px;background:rgba(255,255,255,0.05);color:#fff;font-size:15px;box-sizing:border-box;transition:all 0.3s;border:1px solid rgba(255,255,255,0.1);}input:focus{outline:none;background:rgba(255,255,255,0.15);border-color:#00d2ff;box-shadow:0 0 10px rgba(0,210,255,0.5);}.btn{width:100%%;padding:14px;background:linear-gradient(90deg,#00d2ff 0%%,#3a7bd5 100%%);border:none;border-radius:8px;color:white;font-size:16px;font-weight:600;cursor:pointer;margin-top:10px;}</style></head><body><div class='card'><h1>ESP32 SIP Setup</h1><form method='POST' action='/setup'><div class='form-group'><label>WiFi SSID</label><input type='text' name='ssid' value='%s'></div><div class='form-group'><label>WiFi Password</label><input type='password' name='pass' value='%s'></div><div class='form-group'><label>SIP Server</label><input type='text' name='sip_server' value='%s'></div><div class='form-group'><label>SIP Username</label><input type='text' name='sip_user' value='%s'></div><div class='form-group'><label>SIP Password</label><input type='password' name='sip_pass' value='%s'></div><button type='submit' class='btn'>Save & Restart</button></form></div></body></html>",
             g_settings->wifi_ssid, g_settings->wifi_password, 
             g_settings->sip_server, g_settings->sip_user, g_settings->sip_password);
     } else {
         int st = g_sip_client ? sip_client_get_call_state(g_sip_client) : 0;
-        snprintf(resp_str, sizeof(resp_str), 
-            "<html><body><h1>ESP32 SIP Phone</h1>"
-            "<p>Call State: %d</p>"
-            "<form method='POST' action='/call'><input type='submit' value='Call'/></form>"
-            "<form method='POST' action='/answer'><input type='submit' value='Answer'/></form>"
-            "<form method='POST' action='/hangup'><input type='submit' value='Hangup'/></form>"
-            "</body></html>", st);
+        snprintf(resp_str, 4096, 
+            "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>ESP32 SIP Phone</title><style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');body{margin:0;font-family:'Inter',sans-serif;background:linear-gradient(135deg,#141e30,#243b55);height:100vh;display:flex;justify-content:center;align-items:center;color:#fff;}.card{background:rgba(255,255,255,0.05);backdrop-filter:blur(15px);border-radius:20px;padding:40px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);width:100%%;max-width:320px;}h1{margin-top:0;font-size:26px;}.status{font-size:18px;margin-bottom:30px;color:#00d2ff;font-weight:600;}.btn{width:100%%;padding:15px;margin-bottom:15px;border:none;border-radius:10px;color:white;font-size:16px;font-weight:600;cursor:pointer;}.btn-call{background:linear-gradient(90deg,#11998e,#38ef7d);}.btn-answer{background:linear-gradient(90deg,#2193b0,#6dd5ed);}.btn-hangup{background:linear-gradient(90deg,#cb2d3e,#ef473a);}</style></head><body><div class='card'><h1>ESP32 Intercom</h1><div class='status'>State: %d</div><form method='POST' action='/call'><button type='submit' class='btn btn-call'>Call</button></form><form method='POST' action='/answer'><button type='submit' class='btn btn-answer'>Answer</button></form><form method='POST' action='/hangup'><button type='submit' class='btn btn-hangup'>Hangup</button></form></div></body></html>", st);
     }
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
+    free(resp_str);
     return ESP_OK;
 }
 
