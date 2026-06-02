@@ -43,6 +43,13 @@ Once connected to Wi-Fi and registered with your SIP Server, you can control cal
 ![Call UI](assets/sip_call_ui.png)
 
 
+## Common Use Cases
+
+*   **Smart SIP Doorbell (Doorphone):** Connect a button to the ESP32. When pressed, it calls your smartphone via a SIP server (like Asterisk or FreePBX), allowing you to talk to the guest.
+*   **Smart Home Intercom:** Use with Home Assistant (via SIP integration) to create room-to-room intercoms or broadcast announcements.
+*   **Emergency Call Button:** A standalone Wi-Fi button that dials a predefined emergency contact or nursing station instantly.
+*   **Paging / Public Address System:** With `CTRL_METHOD_AUTO` (auto-answer) enabled, the ESP32 can be connected to an amplifier to act as an IP speaker for warehouse or office paging.
+
 ## Project Structure
 
 ```
