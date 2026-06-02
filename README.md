@@ -17,6 +17,32 @@ This project provides a robust, production-ready foundation for VoIP intercommun
   * `CTRL_METHOD_WEB`: Lightweight built-in HTTP server to control calls from a browser.
   * `CTRL_METHOD_AUTO`: Auto-answer mode for intercom or paging systems.
 
+## Supported Environments & Versions
+
+While this project is designed to be highly portable across ESP-IDF versions and ESP32 hardware, the following environments are explicitly supported and tested (but not strictly limited to):
+
+*   **ESP-IDF Versions**: v4.4, v5.0, v5.1+
+*   **Supported Hardware**: 
+    *   ESP32 (Classic dual-core)
+    *   ESP32-S2, ESP32-S3
+    *   ESP32-C3 (RISC-V single-core, tested with Half-Duplex AEC)
+*   **Audio Codecs**: 
+    *   I2S Breakouts (e.g., INMP441 Mic + MAX98357A DAC)
+    *   I2C Codecs (e.g., ES8388, typically on AudioKit boards)
+
+## Web Interface
+
+The project includes a built-in lightweight HTTP server for configuration and call management.
+
+### Captive Portal (Initial Setup)
+When Wi-Fi or SIP credentials are missing, the ESP32 hosts an AP (ESP-SIP-Setup). Connect to it and navigate to 192.168.4.1 to enter your credentials.
+![Captive Portal Setup](assets/captive_portal.png)
+
+### Call Control Interface
+Once connected to Wi-Fi and registered with your SIP Server, you can control calls via the web interface by visiting the ESP32's assigned IP address.
+![Call UI](assets/sip_call_ui.png)
+
+
 ## Project Structure
 
 ```
