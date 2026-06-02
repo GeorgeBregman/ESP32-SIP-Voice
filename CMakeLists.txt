@@ -7,8 +7,9 @@ idf_component_register(SRCS
                        "audio_pipeline.c"
                        "g711_codec.c"
                        "codec_driver.c"
+                       "ui_controller.c"
                        INCLUDE_DIRS "."
-                       REQUIRES lwip # Add other required components like driver, freertos, esp_wifi, etc.
+                       REQUIRES lwip mbedtls # Add other required components like driver, freertos, esp_wifi, etc.
                       )
 
 # If using ESP-ADF components for codec drivers, add them here:

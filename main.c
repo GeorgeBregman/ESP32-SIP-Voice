@@ -10,6 +10,7 @@
 #include "sip_client.h"
 #include "audio_pipeline.h"
 #include "app_config.h" // Include configurations
+#include "ui_controller.h" // Include UI Controller
 
 static const char *TAG = "MAIN";
 
@@ -60,16 +61,6 @@ void app_control_task(void *pvParameters) {
             current_app_state = APP_STATE_IDLE;
             // Maybe trigger an LED or other indicator
         }
-
-        // --- Example Call Initiation (triggered by button press perhaps) ---
-        // bool initiate_call = check_call_button(); // Placeholder
-        // if (initiate_call && current_app_state == APP_STATE_IDLE) {
-        //     ESP_LOGI(TAG, "Initiating outbound call...");
-        //     if (g_sip_client) {
-        //          // Target URI needs to be obtained somehow (e.g., config, input)
-        //         sip_client_initiate_call(g_sip_client, "sip:target_user@your_domain.com");
-        //     }
-        // }
 
         // Add logic here to react to call state changes signaled FROM sip_client
         // e.g., if sip_client signals incoming call, update state, maybe ring a buzzer
@@ -127,6 +118,10 @@ void app_main(void) {
          }
     }
 
+    // Initialize UI Controller
+    if (g_sip_client) {
+        ui_controller_init(g_sip_client);
+    }
 
     // Create application control task (optional, but good for managing overall state)
     xTaskCreate(app_control_task, "app_ctrl", 4096, NULL, 6, NULL);

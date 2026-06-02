@@ -47,6 +47,14 @@ int rtp_jitter_buffer_get(rtp_session_handle_t handle, rtp_header_t* header, uin
 
 static const char* TAG = "RTP";
 
+typedef struct {
+    bool is_valid;
+    uint16_t seq;
+    uint32_t ts;
+    uint8_t payload[RTP_TX_BUFFER_SIZE];
+    size_t payload_len;
+} rtp_packet_entry_t;
+
 typedef struct rtp_session_s {
     int rtp_socket;
     uint16_t local_port;
@@ -54,13 +62,11 @@ typedef struct rtp_session_s {
     uint16_t sequence_number;
     uint32_t timestamp_offset; // Initial timestamp based on sample rate
     // --- Jitter Buffer Fields ---
-    // Example: simple circular buffer
-    // rtp_packet_entry_t jitter_buffer[JITTER_BUFFER_SIZE];
-    // int jitter_read_idx;
-    // int jitter_write_idx;
-    // int jitter_count;
-    // uint16_t last_played_seq;
-    // Add mutex for jitter buffer access
+    rtp_packet_entry_t jitter_buffer[JITTER_BUFFER_SIZE];
+    SemaphoreHandle_t jitter_mutex;
+    uint16_t next_playout_seq;
+    bool is_buffering;
+    int valid_packets_count;
 } rtp_session_t;
 
 rtp_session_handle_t rtp_session_create(uint16_t local_port) {
@@ -96,7 +102,9 @@ rtp_session_handle_t rtp_session_create(uint16_t local_port) {
     }
 
     ESP_LOGI(TAG, "RTP session created. SSRC: 0x%08lX, Listening on port %d", session->ssrc, session->local_port);
-    // Initialize jitter buffer here
+    session->jitter_mutex = xSemaphoreCreateMutex();
+    session->is_buffering = true;
+    session->valid_packets_count = 0;
     return session;
 }
 
@@ -107,7 +115,9 @@ void rtp_session_delete(rtp_session_handle_t handle) {
     if (session->rtp_socket >= 0) {
         close(session->rtp_socket);
     }
-    // Delete jitter buffer resources
+    if (session->jitter_mutex) {
+        vSemaphoreDelete(session->jitter_mutex);
+    }
     free(session);
     ESP_LOGI(TAG, "RTP session deleted.");
 }
@@ -227,38 +237,85 @@ uint32_t rtp_get_ssrc(rtp_session_handle_t handle) {
 }
 
 
-// --- Jitter Buffer Implementation (Conceptual Placeholders) ---
+// --- Jitter Buffer Implementation ---
 
 void rtp_jitter_buffer_put(rtp_session_handle_t handle, const rtp_header_t* header, const uint8_t* payload, size_t len) {
-     // TODO: Implement jitter buffer logic
-     // - Acquire mutex
-     // - Check if buffer is full
-     // - Find correct insertion point based on sequence number (handle wrap-around)
-     // - Store header info (seq, ts) and payload
-     // - Update write index, count
-     // - Release mutex
-     ESP_LOGD(TAG, "Jitter Put: Seq=%d, Len=%d (Not Implemented)", header->seq, len);
+    rtp_session_t* session = (rtp_session_t*)handle;
+    if (!session || !session->jitter_mutex || !header || !payload) return;
+
+    xSemaphoreTake(session->jitter_mutex, portMAX_DELAY);
+
+    if (session->is_buffering && session->valid_packets_count == 0) {
+        // First packet initializes the sequence tracker
+        session->next_playout_seq = header->seq;
+    }
+
+    // Determine index by seq % JITTER_BUFFER_SIZE
+    int idx = header->seq % JITTER_BUFFER_SIZE;
+
+    // Only store if the slot is empty or holds an old packet we can overwrite
+    if (!session->jitter_buffer[idx].is_valid || session->jitter_buffer[idx].seq != header->seq) {
+        session->jitter_buffer[idx].is_valid = true;
+        session->jitter_buffer[idx].seq = header->seq;
+        session->jitter_buffer[idx].ts = header->ts;
+        size_t copy_len = len < sizeof(session->jitter_buffer[idx].payload) ? len : sizeof(session->jitter_buffer[idx].payload);
+        memcpy(session->jitter_buffer[idx].payload, payload, copy_len);
+        session->jitter_buffer[idx].payload_len = copy_len;
+        session->valid_packets_count++;
+    }
+
+    // Stop buffering when we have enough packets
+    if (session->is_buffering && session->valid_packets_count >= JITTER_BUFFER_SIZE / 2) {
+        session->is_buffering = false; 
+    }
+
+    xSemaphoreGive(session->jitter_mutex);
 }
 
 int rtp_jitter_buffer_get(rtp_session_handle_t handle, rtp_header_t* header, uint8_t* payload_buffer, size_t buffer_len) {
-     // TODO: Implement jitter buffer logic
-     // - Acquire mutex
-     // - Determine target playback time / target sequence number
-     // - Check if the target packet (or next available) is present
-     // - Handle packet loss (return silence/comfort noise flag, or generate PLC data)
-     // - Handle late packets (discard?)
-     // - If packet available:
-     //    - Copy header and payload to output buffers
-     //    - Update read index, count, last_played_seq
-     //    - Release mutex
-     //    - Return payload length
-     // - Else (packet missing/not ready):
-     //    - Release mutex
-     //    - Return 0 or negative value indicating loss/wait
-     ESP_LOGD(TAG, "Jitter Get (Not Implemented) - Playing silence/default");
-     // Simulate silence for now
-     memset(payload_buffer, 0, AUDIO_SAMPLES_PER_FRAME); // Assuming G711 1 byte per sample
-     header->seq++; // Just increment seq artificially
-     header->ts += AUDIO_SAMPLES_PER_FRAME; // Increment timestamp
-     return AUDIO_SAMPLES_PER_FRAME; // Return expected length for silence
+    rtp_session_t* session = (rtp_session_t*)handle;
+    if (!session || !session->jitter_mutex || !payload_buffer) return 0;
+
+    xSemaphoreTake(session->jitter_mutex, portMAX_DELAY);
+
+    if (session->is_buffering) {
+        // Still buffering, return silence
+        xSemaphoreGive(session->jitter_mutex);
+        memset(payload_buffer, 0, AUDIO_SAMPLES_PER_FRAME);
+        return AUDIO_SAMPLES_PER_FRAME;
+    }
+
+    int idx = session->next_playout_seq % JITTER_BUFFER_SIZE;
+    int return_len = 0;
+
+    if (session->jitter_buffer[idx].is_valid && session->jitter_buffer[idx].seq == session->next_playout_seq) {
+        // Packet found!
+        return_len = session->jitter_buffer[idx].payload_len;
+        size_t copy_len = return_len < buffer_len ? return_len : buffer_len;
+        memcpy(payload_buffer, session->jitter_buffer[idx].payload, copy_len);
+        
+        if (header) {
+             header->seq = session->jitter_buffer[idx].seq;
+             header->ts = session->jitter_buffer[idx].ts;
+        }
+
+        session->jitter_buffer[idx].is_valid = false;
+        session->valid_packets_count--;
+        session->next_playout_seq++;
+    } else {
+        // Packet lost or late! Play silence/PLC.
+        memset(payload_buffer, 0, AUDIO_SAMPLES_PER_FRAME);
+        return_len = AUDIO_SAMPLES_PER_FRAME;
+        
+        // Re-buffer if completely empty
+        if (session->valid_packets_count == 0) {
+             session->is_buffering = true;
+        } else {
+             // Just skip this packet
+             session->next_playout_seq++;
+        }
+    }
+
+    xSemaphoreGive(session->jitter_mutex);
+    return return_len;
 }

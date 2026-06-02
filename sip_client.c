@@ -55,6 +55,7 @@ uint16_t sip_client_get_local_rtp_port(sip_client_handle_t handle); // Function 
 #include "lwip/dns.h"
 #include "freertos/timers.h"
 #include "wifi_manager.h" // For get_my_ip()
+#include "mbedtls/md5.h"
 
 static const char *TAG = "SIP_CLIENT";
 
@@ -91,8 +92,19 @@ typedef struct sip_client_s {
     char current_to_tag[32];   // Received from peer in responses/requests
     char current_remote_uri[128]; // URI of the remote party in active call
 
+    char reg_call_id[64]; // Call-ID for registration
+
     // Add fields for ongoing transaction management (e.g., last request, timeouts)
-    // ...
+    char auth_realm[64];
+    char auth_nonce[64];
+    bool has_auth_info;
+
+    // Buffers to store incoming request headers for generating responses
+    char last_via[256];
+    char last_from[256];
+    char last_to[256];
+    char last_call_id[128];
+    char last_cseq[64];
 
 } sip_client_t;
 
@@ -109,6 +121,36 @@ static void process_incoming_sip(sip_client_t *client, char *buffer, int len, st
 static void registration_timer_callback(TimerHandle_t xTimer);
 static bool parse_sdp(const char *sdp_body, ip_addr_t *remote_ip, uint16_t *remote_port); // Simplified SDP parser
 static int generate_sdp(sip_client_t *client, char *buffer, size_t buffer_len); // Generates our SDP offer/answer
+
+static void compute_digest_response(const char *username, const char *password, const char *realm, const char *nonce, const char *method, const char *uri, char *response) {
+    mbedtls_md5_context ctx;
+    unsigned char ha1[16], ha2[16], resp[16];
+    char ha1_hex[33], ha2_hex[33], buf[256];
+
+    mbedtls_md5_init(&ctx);
+    // HA1 = MD5(username:realm:password)
+    snprintf(buf, sizeof(buf), "%s:%s:%s", username, realm, password);
+    mbedtls_md5_starts_ret(&ctx);
+    mbedtls_md5_update_ret(&ctx, (unsigned char*)buf, strlen(buf));
+    mbedtls_md5_finish_ret(&ctx, ha1);
+    for(int i=0; i<16; i++) sprintf(&ha1_hex[i*2], "%02x", ha1[i]);
+
+    // HA2 = MD5(method:uri)
+    snprintf(buf, sizeof(buf), "%s:%s", method, uri);
+    mbedtls_md5_starts_ret(&ctx);
+    mbedtls_md5_update_ret(&ctx, (unsigned char*)buf, strlen(buf));
+    mbedtls_md5_finish_ret(&ctx, ha2);
+    for(int i=0; i<16; i++) sprintf(&ha2_hex[i*2], "%02x", ha2[i]);
+
+    // response = MD5(HA1:nonce:HA2)
+    snprintf(buf, sizeof(buf), "%s:%s:%s", ha1_hex, nonce, ha2_hex);
+    mbedtls_md5_starts_ret(&ctx);
+    mbedtls_md5_update_ret(&ctx, (unsigned char*)buf, strlen(buf));
+    mbedtls_md5_finish_ret(&ctx, resp);
+    for(int i=0; i<16; i++) sprintf(&response[i*2], "%02x", resp[i]);
+    
+    mbedtls_md5_free(&ctx);
+}
 
 // --- Public Functions ---
 
@@ -129,6 +171,8 @@ sip_client_handle_t sip_client_init(EventGroupHandle_t app_event_group, EventBit
     client->current_cseq = 1; // Initial CSeq
     client->local_sip_port = SIP_LOCAL_PORT;
     client->local_rtp_port = RTP_LOCAL_PORT_BASE; // Simple assignment for now
+    client->has_auth_info = false;
+    sprintf(client->reg_call_id, "%lx-%lx", esp_random(), esp_random());
 
     // Copy configuration
     strncpy(client->user, SIP_USER, sizeof(client->user) - 1);
@@ -290,6 +334,69 @@ sip_call_state_t sip_client_get_call_state(sip_client_handle_t handle) {
 
 // --- Private Task and Helper Functions ---
 
+static void sip_task(void *pvParameters);
+
+static void perform_stun_lookup(sip_client_t *client) {
+#if USE_STUN
+    ESP_LOGI(TAG, "Performing STUN lookup against %s:%d", STUN_SERVER_IP, STUN_SERVER_PORT);
+    
+    ip_addr_t stun_addr;
+    if (dns_gethostbyname(STUN_SERVER_IP, &stun_addr, NULL, NULL) != ERR_OK) {
+        if (!ipaddr_aton(STUN_SERVER_IP, &stun_addr)) {
+            ESP_LOGE(TAG, "Failed to resolve STUN server");
+            return;
+        }
+    }
+    
+    struct sockaddr_in dest_addr;
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_port = htons(STUN_SERVER_PORT);
+    dest_addr.sin_addr.s_addr = ip_addr_get_ip4_u32(&stun_addr);
+
+    uint8_t stun_req[20] = {
+        0x00, 0x01, // Binding Request
+        0x00, 0x00, // Length: 0
+        0x21, 0x12, 0xA4, 0x42 // Magic Cookie
+    };
+    for(int i=0; i<12; i++) stun_req[8+i] = esp_random() & 0xFF;
+
+    sendto(client->sip_socket, stun_req, sizeof(stun_req), 0, (struct sockaddr*)&dest_addr, sizeof(dest_addr));
+
+    fd_set readfds;
+    FD_ZERO(&readfds);
+    FD_SET(client->sip_socket, &readfds);
+    struct timeval tv = { .tv_sec = 2, .tv_usec = 0 };
+
+    if (select(client->sip_socket + 1, &readfds, NULL, NULL, &tv) > 0) {
+        uint8_t resp[256];
+        struct sockaddr_in src;
+        socklen_t srclen = sizeof(src);
+        int len = recvfrom(client->sip_socket, resp, sizeof(resp), 0, (struct sockaddr*)&src, &srclen);
+        if (len >= 20 && resp[0] == 0x01 && resp[1] == 0x01) { // Binding Response
+            uint16_t attr_len = (resp[2] << 8) | resp[3];
+            int offset = 20;
+            while (offset + 4 <= len && offset - 20 < attr_len) {
+                uint16_t a_type = (resp[offset] << 8) | resp[offset+1];
+                uint16_t a_len = (resp[offset+2] << 8) | resp[offset+3];
+                offset += 4;
+                if (a_type == 0x0020 && a_len >= 8) { // XOR Mapped Address
+                    uint16_t port = ((resp[offset+2] << 8) | resp[offset+3]) ^ 0x2112;
+                    uint32_t ip = ((resp[offset+4] << 24) | (resp[offset+5] << 16) | (resp[offset+6] << 8) | resp[offset+7]) ^ 0x2112A442;
+                    struct in_addr pub_ip = { .s_addr = htonl(ip) };
+                    sprintf(client->local_ip_str, "%s", inet_ntoa(pub_ip));
+                    client->local_sip_port = port;
+                    ESP_LOGI(TAG, "STUN successful! Public IP: %s:%d", client->local_ip_str, port);
+                    break;
+                }
+                offset += a_len;
+            }
+        }
+    } else {
+        ESP_LOGE(TAG, "STUN request timed out");
+    }
+#endif
+}
+
 static void sip_task(void *pvParameters) {
     sip_client_t *client = (sip_client_t *)pvParameters;
     char rx_buffer[2048]; // Buffer for incoming SIP messages
@@ -329,6 +436,9 @@ static void sip_task(void *pvParameters) {
         return;
     }
 
+    // Attempt STUN if enabled
+    perform_stun_lookup(client);
+
     // --- Start Initial Registration ---
     send_register(client, true); // Send first REGISTER message
     // Start timer only after successful REGISTER response normally, simplified here.
@@ -336,6 +446,8 @@ static void sip_task(void *pvParameters) {
 
 
     ESP_LOGI(TAG, "SIP Task listening on UDP port %d", client->local_sip_port);
+
+    TickType_t last_keepalive = xTaskGetTickCount();
 
     while (1) {
         // Use select for timeout and non-blocking read
@@ -354,13 +466,14 @@ static void sip_task(void *pvParameters) {
             vTaskDelay(pdMS_TO_TICKS(1000));
             continue;
         } else if (s == 0) {
-            // Timeout - opportunity to check timers or perform periodic tasks
-            // ESP_LOGD(TAG, "Select timeout");
-            // Check registration status, resend if needed
-            if (!client->is_registered) {
-                 // Simple retry logic
-                 // send_register(client, true); // Re-send initial REGISTER
-                 // vTaskDelay(pdMS_TO_TICKS(SIP_RETRY_INTERVAL_MS));
+            // Timeout - check for keep-alive
+            if (pdTICKS_TO_MS(xTaskGetTickCount() - last_keepalive) > 20000) {
+                last_keepalive = xTaskGetTickCount();
+                if (client->is_registered) {
+                    // Send NAT keepalive (empty UDP payload with CRLF)
+                    sendto(client->sip_socket, "\r\n\r\n", 4, 0, (struct sockaddr *)&client->server_addr, sizeof(client->server_addr));
+                    ESP_LOGD(TAG, "Sent NAT keepalive");
+                }
             }
         } else {
             // Data available on socket
@@ -443,9 +556,19 @@ static void send_register(sip_client_t *client, bool initial_registration) {
     sprintf(branch, "z9hG4bK%lx", esp_random()); // Basic branch generation
 
     // TODO: Add Digest Authentication handling if server sends 401/407
-    // This requires parsing WWW-Authenticate/Proxy-Authenticate headers
-    // and generating Authorization/Proxy-Authorization headers.
-    // This example sends a basic REGISTER without Auth.
+    // This example sends a basic REGISTER without Auth initially, then includes auth if has_auth_info is set.
+
+    char auth_header[256] = {0};
+    char uri[128];
+    sprintf(uri, "sip:%s", client->domain);
+
+    if (client->has_auth_info) {
+        char response[33];
+        compute_digest_response(client->user, client->password, client->auth_realm, client->auth_nonce, "REGISTER", uri, response);
+        snprintf(auth_header, sizeof(auth_header),
+                 "Authorization: Digest username=\"%s\", realm=\"%s\", nonce=\"%s\", uri=\"%s\", response=\"%s\"\r\n",
+                 client->user, client->auth_realm, client->auth_nonce, uri, response);
+    }
 
     int len = snprintf(buffer, sizeof(buffer),
         "REGISTER sip:%s SIP/2.0\r\n"
@@ -453,9 +576,10 @@ static void send_register(sip_client_t *client, bool initial_registration) {
         "Max-Forwards: 70\r\n"
         "From: \"%s\" <sip:%s@%s>;tag=%lx\r\n"
         "To: \"%s\" <sip:%s@%s>\r\n"
-        "Call-ID: %lx-%lx\r\n" // Call-ID should be unique per registration attempt
+        "Call-ID: %s\r\n" // Call-ID must be consistent per registration session
         "CSeq: %lu REGISTER\r\n"
         "Contact: <sip:%s@%s:%d>\r\n" // IMPORTANT: Use correct local IP/Port
+        "%s" // Auth Header
         "Expires: %d\r\n"
         "Allow: INVITE, ACK, CANCEL, OPTIONS, BYE\r\n" // Advertise supported methods
         "User-Agent: ESP32-SIPClient/1.0\r\n"
@@ -465,9 +589,10 @@ static void send_register(sip_client_t *client, bool initial_registration) {
         client->local_ip_str, client->local_sip_port, branch, // Use discovered public IP/Port if using STUN
         client->display_name, client->user, client->domain, esp_random(), // From tag unique per REGISTER
         client->display_name, client->user, client->domain,
-        esp_random(), esp_random(), // Unique Call-ID for registration
+        client->reg_call_id, // Consistent Call-ID for registration
         client->current_cseq++, // Increment CSeq
         client->user, client->local_ip_str, client->local_sip_port, // Use correct IP/Port
+        auth_header,
         initial_registration ? SIP_REGISTRATION_EXPIRY : SIP_REGISTRATION_EXPIRY // Use 0 to unregister
         // Add Content-Length: 0 for REGISTER
     );
@@ -555,13 +680,40 @@ static void send_invite(sip_client_t *client, const char *target_uri) {
 }
 
 static void send_ack(sip_client_t *client) {
-     // ACK is sent in response to a final (2xx) response to INVITE
-     // It reuses Via, From, To, Call-ID, CSeq (number only) from the INVITE.
-     // The To header *must* include the tag received in the 200 OK.
-     // The Request-URI is the Contact URI received in the 200 OK. (Important!)
-     ESP_LOGW(TAG, "send_ack: NOT IMPLEMENTED"); // Placeholder
-     // Build ACK message...
-     // sendto(...)
+     if (client->call_state < SIP_CALL_STATE_CONNECTING) return;
+     
+     char buffer[1024];
+     char branch[32];
+     sprintf(branch, "z9hG4bK%lx", esp_random());
+
+     int len = snprintf(buffer, sizeof(buffer),
+         "ACK %s SIP/2.0\r\n"
+         "Via: SIP/2.0/UDP %s:%d;branch=%s;rport\r\n"
+         "Max-Forwards: 70\r\n"
+         "From: \"%s\" <sip:%s@%s>;tag=%s\r\n"
+         "To: <%s>;tag=%s\r\n"
+         "Call-ID: %s\r\n"
+         "CSeq: %lu ACK\r\n"
+         "Contact: <sip:%s@%s:%d>\r\n"
+         "User-Agent: ESP32-SIPClient/1.0\r\n"
+         "Content-Length: 0\r\n"
+         "\r\n",
+         client->current_remote_uri,
+         client->local_ip_str, client->local_sip_port, branch,
+         client->display_name, client->user, client->domain, client->current_from_tag,
+         client->current_remote_uri, client->current_to_tag,
+         client->current_call_id,
+         client->current_cseq - 1, // Must match the INVITE CSeq
+         client->user, client->local_ip_str, client->local_sip_port
+     );
+
+     if (len > 0 && len < sizeof(buffer)) {
+          ESP_LOGI(TAG, "Sending ACK");
+          sendto(client->sip_socket, buffer, len, 0, (struct sockaddr *)&client->server_addr, sizeof(client->server_addr));
+          client->call_state = SIP_CALL_STATE_ACTIVE;
+     } else {
+          ESP_LOGE(TAG, "Buffer overflow creating ACK message");
+     }
 }
 
 static void send_bye(sip_client_t *client) {
@@ -604,32 +756,42 @@ static void send_bye(sip_client_t *client) {
 }
 
 static void send_sip_response(sip_client_t *client, int status_code, const char *reason_phrase, const char* to_tag) {
-    // This function needs context from the received request (Via, From, To, Call-ID, CSeq)
-    // This is a simplified placeholder showing the concept.
-    ESP_LOGW(TAG, "send_sip_response (%d %s): NOT FULLY IMPLEMENTED", status_code, reason_phrase);
-    // Example: Sending 200 OK to INVITE
-    // char buffer[1024];
-    // char sdp_buffer[512];
-    // int sdp_len = generate_sdp(client, sdp_buffer, sizeof(sdp_buffer));
-    // int len = snprintf(buffer, sizeof(buffer),
-    //      "SIP/2.0 %d %s\r\n"
-    //      "Via: ...\r\n" // Copy Via header(s) from request
-    //      "From: ...\r\n" // Copy From header from request
-    //      "To: ...;tag=%s\r\n" // Copy To header from request, ADD our tag
-    //      "Call-ID: ...\r\n" // Copy Call-ID from request
-    //      "CSeq: ...\r\n" // Copy CSeq from request
-    //      "Contact: <sip:%s@%s:%d>\r\n"
-    //      "Content-Type: application/sdp\r\n"
-    //      "Content-Length: %d\r\n"
-    //      "\r\n"
-    //      "%s",
-    //      status_code, reason_phrase,
-    //      to_tag ? to_tag : "", // Add our generated tag
-    //      client->user, client->local_ip_str, client->local_sip_port,
-    //      (sdp_len > 0) ? sdp_len : 0,
-    //      (sdp_len > 0) ? sdp_buffer : ""
-    // );
-    // sendto(...) directed back to the source address from the Via header (or source IP/Port)
+    char buffer[1024];
+    char sdp_buffer[512];
+    int sdp_len = 0;
+    
+    if (status_code == 200) {
+        sdp_len = generate_sdp(client, sdp_buffer, sizeof(sdp_buffer));
+    }
+
+    int len = snprintf(buffer, sizeof(buffer),
+         "SIP/2.0 %d %s\r\n"
+         "Via: %s\r\n"
+         "From: %s\r\n"
+         "To: %s;tag=%s\r\n"
+         "Call-ID: %s\r\n"
+         "CSeq: %s\r\n"
+         "Contact: <sip:%s@%s:%d>\r\n"
+         "%s"
+         "Content-Length: %d\r\n"
+         "\r\n"
+         "%s",
+         status_code, reason_phrase,
+         client->last_via,
+         client->last_from,
+         client->last_to, to_tag ? to_tag : "",
+         client->last_call_id,
+         client->last_cseq,
+         client->user, client->local_ip_str, client->local_sip_port,
+         (sdp_len > 0) ? "Content-Type: application/sdp\r\n" : "",
+         sdp_len,
+         (sdp_len > 0) ? sdp_buffer : ""
+    );
+    
+    if (len > 0 && len < sizeof(buffer)) {
+         ESP_LOGI(TAG, "Sending Response %d %s", status_code, reason_phrase);
+         sendto(client->sip_socket, buffer, len, 0, (struct sockaddr *)&client->server_addr, sizeof(client->server_addr));
+    }
 }
 
 
@@ -759,8 +921,28 @@ static void process_incoming_sip(sip_client_t *client, char *buffer, int len, st
                      client->app_callbacks.on_registration_status(true);
                  }
             } else if (status_code == 401 || status_code == 407) {
-                 ESP_LOGW(TAG, "Registration failed: Authentication required (%d). Digest Auth not implemented.", status_code);
-                 // TODO: Implement Digest Authentication: parse WWW-Authenticate/Proxy-Authenticate, generate response
+                 ESP_LOGW(TAG, "Registration failed: Authentication required (%d). Retrying with Digest Auth.", status_code);
+                 
+                 // Extract realm and nonce from WWW-Authenticate or Proxy-Authenticate
+                 char auth_hdr_val[256] = {0};
+                 if (parse_header(buffer, status_code == 401 ? "WWW-Authenticate" : "Proxy-Authenticate", auth_hdr_val, sizeof(auth_hdr_val))) {
+                     char *realm_ptr = strstr(auth_hdr_val, "realm=\"");
+                     if (realm_ptr) {
+                         sscanf(realm_ptr + 7, "%63[^\"]", client->auth_realm);
+                     }
+                     char *nonce_ptr = strstr(auth_hdr_val, "nonce=\"");
+                     if (nonce_ptr) {
+                         sscanf(nonce_ptr + 7, "%63[^\"]", client->auth_nonce);
+                     }
+                     if (realm_ptr && nonce_ptr) {
+                         ESP_LOGI(TAG, "Extracted Auth Realm: %s, Nonce: %s", client->auth_realm, client->auth_nonce);
+                         client->has_auth_info = true;
+                         // Retry registration with auth
+                         send_register(client, false);
+                         return; // Don't trigger failure callback yet
+                     }
+                 }
+
                  client->is_registered = false;
                  xEventGroupClearBits(client->event_group, client->registered_bit);
                  xTimerStop(client->registration_timer, portMAX_DELAY); // Stop timer
@@ -786,11 +968,17 @@ static void process_incoming_sip(sip_client_t *client, char *buffer, int len, st
                        // Extract To tag if present
                        // TODO: Handle 183 with SDP (early media)
                        if (status_code == 180) client->call_state = SIP_CALL_STATE_RINGING; // Or similar state
-                  } else if (status_code == 200) { // Call Accepted
+                   } else if (status_code == 200) { // Call Accepted
                        ESP_LOGI(TAG, "INVITE accepted (200 OK)");
                        client->call_state = SIP_CALL_STATE_CONNECTING;
                        // Extract To tag from response - IMPORTANT
-                       // char *tag_ptr = strstr(to_hdr, ";tag="); if (tag_ptr) strncpy(client->current_to_tag, tag_ptr + 5, ...);
+                       char *tag_ptr = strstr(to_hdr, ";tag="); 
+                       if (tag_ptr) {
+                           strncpy(client->current_to_tag, tag_ptr + 5, sizeof(client->current_to_tag) - 1);
+                       }
+
+                       // Send ACK immediately
+                       send_ack(client);
 
                        // Parse SDP from the 200 OK body
                        char *sdp_body = strstr(buffer, "\r\n\r\n");
@@ -864,11 +1052,11 @@ static void process_incoming_sip(sip_client_t *client, char *buffer, int len, st
         }
         ESP_LOGD(TAG, "Received Request: %s", method);
 
-        parse_header(buffer, "CSeq", cseq_hdr, sizeof(cseq_hdr));
-        parse_header(buffer, "Call-ID", call_id_hdr, sizeof(call_id_hdr));
-        parse_header(buffer, "From", from_hdr, sizeof(from_hdr));
-        parse_header(buffer, "To", to_hdr, sizeof(to_hdr));
-        parse_header(buffer, "Via", via_hdr, sizeof(via_hdr)); // Get top Via for response routing
+        parse_header(buffer, "CSeq", client->last_cseq, sizeof(client->last_cseq));
+        parse_header(buffer, "Call-ID", client->last_call_id, sizeof(client->last_call_id));
+        parse_header(buffer, "From", client->last_from, sizeof(client->last_from));
+        parse_header(buffer, "To", client->last_to, sizeof(client->last_to));
+        parse_header(buffer, "Via", client->last_via, sizeof(client->last_via)); // Get top Via for response routing
         parse_header(buffer, "Contact", contact_hdr, sizeof(contact_hdr));
 
         // --- Request Handling Logic (Highly Simplified) ---
@@ -880,11 +1068,7 @@ static void process_incoming_sip(sip_client_t *client, char *buffer, int len, st
             }
 
             // Store call details
-            strncpy(client->current_call_id, call_id_hdr, sizeof(client->current_call_id) - 1);
-            // Extract remote URI from From header
-            // Extract From tag
-            // Extract To tag (usually none in initial INVITE)
-            // Generate our To tag for the response
+            strncpy(client->current_call_id, client->last_call_id, sizeof(client->current_call_id) - 1);
             sprintf(client->current_to_tag, "%lx", esp_random());
 
 
@@ -910,12 +1094,14 @@ static void process_incoming_sip(sip_client_t *client, char *buffer, int len, st
 
                        // Notify application layer
                        if (client->app_callbacks.on_incoming_call) {
-                           // Extract caller URI properly from From header
-                           char caller_uri[128];
-                           // sscanf(from_hdr, "%*[^<]<%127[^>]>", caller_uri); // Example extraction
-                           snprintf(caller_uri, sizeof(caller_uri),"%s", from_hdr); // Simplification
-                           client->app_callbacks.on_incoming_call(caller_uri, client->current_call_id);
+                           client->app_callbacks.on_incoming_call(client->last_from, client->current_call_id);
                        }
+
+#ifdef CTRL_METHOD_AUTO
+                       // Auto-answer incoming call
+                       ESP_LOGI(TAG, "Auto-answering incoming call");
+                       sip_client_answer_call(client);
+#endif
 
                   } else {
                        ESP_LOGE(TAG, "Failed to parse SDP in incoming INVITE. Sending 415 Unsupported Media Type.");
@@ -932,17 +1118,7 @@ static void process_incoming_sip(sip_client_t *client, char *buffer, int len, st
                   ESP_LOGI(TAG, "Received ACK for 200 OK. Call is now ACTIVE.");
                   client->call_state = SIP_CALL_STATE_ACTIVE;
                   // Start audio if it wasn't started on sending 200 OK
-                  if(client->audio) {
-                       audio_pipeline_start(client->audio, client->local_rtp_port);
-                  }
-                  // Trigger answered callback if not done earlier
-                  if (client->app_callbacks.on_call_answered) {
-                      client->app_callbacks.on_call_answered(client->current_call_id);
-                  }
-             } else {
-                  ESP_LOGW(TAG, "Received unexpected ACK in state %d", client->call_state);
              }
-
         } else if (strcmp(method, "BYE") == 0) {
              // Peer wants to end the call
              if (client->call_state >= SIP_CALL_STATE_CONNECTING && client->call_state <= SIP_CALL_STATE_ACTIVE) {

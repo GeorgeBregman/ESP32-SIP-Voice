@@ -16,6 +16,7 @@
 #define SIP_LOCAL_PORT         5060            // Local port for SIP UDP socket
 #define SIP_REGISTRATION_EXPIRY 3600           // Registration duration in seconds
 #define SIP_RETRY_INTERVAL_MS  5000            // Interval to retry registration on failure
+#define SIP_TARGET_URI         "sip:1001@192.168.1.100" // Target URI to call
 
 // --- RTP Configuration ---
 #define RTP_LOCAL_PORT_BASE    16384           // Starting local port for RTP (even number)
@@ -25,6 +26,7 @@
 #define AUDIO_SAMPLES_PER_FRAME (AUDIO_SAMPLE_RATE * AUDIO_FRAME_MS / 1000) // 160 samples for 8kHz/20ms
 #define RTP_TX_BUFFER_SIZE     (AUDIO_SAMPLES_PER_FRAME + 12) // G711 byte + RTP Header
 #define RTP_RX_BUFFER_SIZE     (RTP_TX_BUFFER_SIZE * 5)       // Room for multiple packets / jitter
+#define JITTER_BUFFER_SIZE     8                              // Number of packets in jitter buffer
 
 // --- Audio / I2S Configuration ---
 #define I2S_NUM                 I2S_NUM_0
@@ -43,5 +45,26 @@
 
 #define SIP_TASK_STACK_SIZE     8192            // SIP processing can require significant stack
 #define AUDIO_TASK_STACK_SIZE   4096
+
+// --- User Choices ---
+
+// 1. Audio Codec Selection
+// Uncomment ONE of the following:
+#define USE_CODEC_ES8388
+//#define USE_CODEC_INMP441_MAX98357A
+
+// 2. NAT Traversal (STUN)
+// Set to 1 to enable STUN for external network access
+#define USE_STUN 1
+#define STUN_SERVER_IP         "stun.l.google.com"
+#define STUN_SERVER_PORT       19302
+
+// 3. Call Management Interface
+// Uncomment ONE of the following:
+#define CTRL_METHOD_BUTTONS    // Use physical buttons on the board
+//#define CTRL_METHOD_WEB        // Use web interface
+//#define CTRL_METHOD_AUTO       // Auto-answer incoming calls
+
+#define BUTTON_GPIO            GPIO_NUM_0      // GPIO for Call/Answer/Hangup button
 
 #endif // APP_CONFIG_H
