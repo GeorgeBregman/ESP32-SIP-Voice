@@ -54,5 +54,16 @@ esp32_sip_client/
    idf.py -p (YOUR_PORT) flash monitor
    ```
 
+## Next Steps & Important Considerations
+
+While this project implements a solid baseline for a SIP client, here are areas for future expansion depending on your production requirements:
+
+*   **Security (SIPS & SRTP):** For production environments over the open internet, signaling should be encrypted via TLS (SIPS), and the audio stream should be encrypted using SRTP.
+*   **Advanced Audio Processing (AEC & NS):** If using a speakerphone setup (microphone and speaker in the same room), Acoustic Echo Cancellation (AEC) and Noise Suppression (NS) are critical to prevent feedback loops. ESP-ADF provides libraries for this.
+*   **Dynamic Codec Negotiation:** The SDP logic currently defaults to G.711 µ-law. Expanding the SDP parser to negotiate other codecs (like G.722 for HD Voice or OPUS) would make the client more versatile.
+*   **ICE & TURN for Complex NATs:** The basic STUN implementation is great for most home networks, but symmetric NATs may require a TURN server to relay media. Implementing ICE (Interactive Connectivity Establishment) would provide bulletproof NAT traversal.
+*   **Power Optimization:** For battery-powered operation, explore ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration.
+*   **Advanced Call Features:** Support for multiple concurrent calls (call waiting), call transfer (REFER), and putting calls on hold.
+
 ## License
 MIT License
