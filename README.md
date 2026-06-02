@@ -36,11 +36,11 @@ The project includes a built-in lightweight HTTP server for configuration and ca
 
 ### Captive Portal (Initial Setup)
 When Wi-Fi or SIP credentials are missing, the ESP32 hosts an AP (ESP-SIP-Setup). Connect to it and navigate to 192.168.4.1 to enter your credentials.
-![Captive Portal Setup](assets/captive_portal.png)
+![Captive Portal Setup](assets/esp32-sip-phone-setup.jpg)
 
 ### Call Control Interface
 Once connected to Wi-Fi and registered with your SIP Server, you can control calls via the web interface by visiting the ESP32's assigned IP address.
-![Call UI](assets/sip_call_ui.png)
+![Call UI](assets/esp32-ringing.jpg)
 
 
 ## Common Use Cases
