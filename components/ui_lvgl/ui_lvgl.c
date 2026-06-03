@@ -1,14 +1,48 @@
 #include "ui_lvgl.h"
 #include "esp_log.h"
-#include "sip_client.h"
 #include "config_manager.h"
 
 // Check if LVGL is available via component manager
 #if __has_include("lvgl.h")
 #include "lvgl.h"
 #include "esp_lcd_panel_ops.h"
+#include "esp_heap_caps.h"
+#include "esp_timer.h"
+#include "display_tft.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 
 extern esp_lcd_panel_handle_t panel_handle; // from display_tft.c
+
+// --- LVGL runtime driving (tick + handler task + lock) ---
+static SemaphoreHandle_t lvgl_mux = NULL;
+static int disp_w = 240, disp_h = 240;
+
+bool ui_lvgl_lock(int timeout_ms) {
+    if (!lvgl_mux) return true;
+    TickType_t to = (timeout_ms < 0) ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
+    return xSemaphoreTakeRecursive(lvgl_mux, to) == pdTRUE;
+}
+void ui_lvgl_unlock(void) {
+    if (lvgl_mux) xSemaphoreGiveRecursive(lvgl_mux);
+}
+
+static void lvgl_tick_cb(void *arg) {
+    (void)arg;
+    lv_tick_inc(2);
+}
+
+static void lvgl_task(void *arg) {
+    (void)arg;
+    while (1) {
+        if (ui_lvgl_lock(-1)) {
+            lv_timer_handler();
+            ui_lvgl_unlock();
+        }
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+}
 
 static const char *TAG = "UI_LVGL";
 
@@ -133,21 +167,39 @@ void ui_lvgl_init(void) {
         current_theme = hw.ui_theme;
     }
     
+    // Real panel resolution (instead of a hardcoded 240x240).
+    display_tft_get_resolution(&disp_w, &disp_h);
+
+    lvgl_mux = xSemaphoreCreateRecursiveMutex();
     lv_init();
 
-    buf1 = heap_caps_malloc(240 * 240 * sizeof(lv_color_t) / 10, MALLOC_CAP_DMA);
+    // Partial draw buffer: `buf_lines` rows of the panel width.
+    const int buf_lines = 40;
+    size_t buf_px = (size_t)disp_w * buf_lines;
+    buf1 = heap_caps_malloc(buf_px * sizeof(lv_color_t), MALLOC_CAP_DMA);
     if (!buf1) {
         ESP_LOGE(TAG, "Failed to allocate LVGL draw buffer");
         return;
     }
-    lv_disp_draw_buf_init(&disp_buf, buf1, NULL, 240 * 240 / 10);
+    lv_disp_draw_buf_init(&disp_buf, buf1, NULL, buf_px);
 
     lv_disp_drv_init(&disp_drv);
-    disp_drv.hor_res = 240;
-    disp_drv.ver_res = 240;
+    disp_drv.hor_res = disp_w;
+    disp_drv.ver_res = disp_h;
     disp_drv.flush_cb = flush_cb;
     disp_drv.draw_buf = &disp_buf;
     lv_disp_drv_register(&disp_drv);
+
+    // Drive LVGL: a 2 ms tick source + a handler task (LVGL is not thread-safe,
+    // so all lv_* calls from other tasks must hold ui_lvgl_lock()).
+    const esp_timer_create_args_t tick_args = {
+        .callback = &lvgl_tick_cb,
+        .name = "lvgl_tick"
+    };
+    esp_timer_handle_t tick_timer = NULL;
+    if (esp_timer_create(&tick_args, &tick_timer) == ESP_OK) {
+        esp_timer_start_periodic(tick_timer, 2 * 1000); // 2 ms
+    }
 
     if (current_theme == 0) init_theme_siri();
     else if (current_theme == 1) init_theme_iphone();
@@ -166,7 +218,10 @@ void ui_lvgl_init(void) {
         lv_obj_center(status_label);
     }
 
-    ESP_LOGI(TAG, "LVGL setup complete. Theme: %d", current_theme);
+    // Start the handler task only after the initial screen is fully built.
+    xTaskCreate(lvgl_task, "lvgl", 6144, NULL, 4, NULL);
+
+    ESP_LOGI(TAG, "LVGL setup complete. Theme: %d, %dx%d", current_theme, disp_w, disp_h);
 }
 
 void ui_lvgl_switch_screen(ui_screen_t screen, const char *caller_id) {
@@ -231,7 +286,9 @@ void ui_lvgl_update_energy(uint8_t energy_level) {
 // Placeholder if LVGL is not installed
 static const char *TAG = "UI_LVGL";
 void ui_lvgl_init(void) { ESP_LOGW(TAG, "LVGL not found! Skipping UI init."); }
-void ui_lvgl_switch_screen(ui_screen_t screen, const char *caller_id) { }
-void ui_lvgl_update_energy(uint8_t energy_level) { }
+void ui_lvgl_switch_screen(ui_screen_t screen, const char *caller_id) { (void)screen; (void)caller_id; }
+void ui_lvgl_update_energy(uint8_t energy_level) { (void)energy_level; }
+bool ui_lvgl_lock(int timeout_ms) { (void)timeout_ms; return true; }
+void ui_lvgl_unlock(void) { }
 
 #endif

@@ -133,15 +133,17 @@
 #define WEB_UI_PIN             ""
 
 // --- Shared application event-group bits ---
-// (Defined centrally so wifi_manager, sip_client and main agree on them.)
+// (Defined centrally so wifi_manager, sip_client and main agree on them.
+//  Plain literals so this header has no FreeRTOS dependency and can be included
+//  by low-level driver components.)
 #ifndef WIFI_CONNECTED_BIT
-#define WIFI_CONNECTED_BIT  BIT0
+#define WIFI_CONNECTED_BIT  (1 << 0)
 #endif
 #ifndef SIP_REGISTERED_BIT
-#define SIP_REGISTERED_BIT  BIT1
+#define SIP_REGISTERED_BIT  (1 << 1)
 #endif
 #ifndef IP_ACQUIRED_BIT
-#define IP_ACQUIRED_BIT     BIT2
+#define IP_ACQUIRED_BIT     (1 << 2)
 #endif
 
 #endif // APP_CONFIG_H
