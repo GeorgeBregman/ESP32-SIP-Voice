@@ -1,6 +1,6 @@
 # PC Simulator for ESP32-SIP-Voice UI
 
-This folder contains a native PC simulator for the LVGL user interface of the ESP32-SIP-Voice project.
+This folder contains a native PC simulator for the LVGL user interface of the **[ESP32-SIP-Voice](https://github.com/GeorgeBregman/ESP32-SIP-Voice)** project.
 It allows you to develop, test, and preview the GUI themes directly on your Windows, Mac, or Linux computer using SDL2, without needing to flash the ESP32 hardware!
 
 ## Requirements
@@ -72,10 +72,9 @@ cmake --build .
 
 Use your mouse to click on the screen. The mouse pointer emulates touchscreen input, allowing you to interact with the on-screen Answer/End buttons!
 
----
+## License
+MIT License
 
-## About
+## Contact
 
-This simulator is part of the **[ESP32-SIP-Voice](https://github.com/GeorgeBregman/ESP32-SIP-Voice)** project.
-
-Created by **[George Bregman](https://georgebregman.com/)**.
+For questions or support, visit [George Bregman's Website](https://georgebregman.com/).
