@@ -3,4 +3,4 @@ idf_component_register(SRCS "g722_codec.c"
                             "aec_filter.c"
                             "wake_word.c"
                        INCLUDE_DIRS "."
-                       REQUIRES esp-sr)
+                       REQUIRES esp-sr config_store)

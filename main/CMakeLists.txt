@@ -14,7 +14,6 @@ idf_component_register(
         "g711_codec.c"
         "codec_driver.c"
         "ui_controller.c"
-        "config_manager.c"
         "display.c"
     INCLUDE_DIRS
         "."
@@ -32,6 +31,7 @@ idf_component_register(
         driver
         json
         # Project components (../components/*)
+        config_store
         audio_pipeline
         hal
         storage

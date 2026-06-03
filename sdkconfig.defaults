@@ -18,6 +18,12 @@ CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
 # esp-sr: load WakeNet models from the SPIFFS "model" partition.
 CONFIG_MODEL_IN_SPIFFS=y
 
+# LVGL fonts used by the UI themes (clock + labels). Without these the UI falls
+# back to the 14px default and the big clock will look small.
+CONFIG_LV_FONT_MONTSERRAT_18=y
+CONFIG_LV_FONT_MONTSERRAT_28=y
+CONFIG_LV_FONT_MONTSERRAT_48=y
+
 # ---- Recommended for STANDARD/PRO tiers (boards WITH PSRAM) ----
 # Uncomment on ESP32-WROVER / ESP32-S3 modules that have external PSRAM so the
 # large jitter buffer and (PRO) OPUS/AEC have room.
