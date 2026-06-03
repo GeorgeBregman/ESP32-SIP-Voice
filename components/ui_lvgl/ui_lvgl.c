@@ -15,7 +15,7 @@ static lv_disp_draw_buf_t disp_buf;
 static lv_color_t *buf1;
 static lv_disp_drv_t disp_drv;
 
-static lv_obj_t * ai_face_arc;
+static lv_obj_t * siri_orb;
 static lv_obj_t * status_label;
 
 static void flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_map) {
@@ -26,7 +26,7 @@ static void flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *colo
 }
 
 void ui_lvgl_init(void) {
-    ESP_LOGI(TAG, "Initializing LVGL User Interface...");
+    ESP_LOGI(TAG, "Initializing LVGL Apple-style Interface...");
     
     lv_init();
 
@@ -45,62 +45,64 @@ void ui_lvgl_init(void) {
     disp_drv.draw_buf = &disp_buf;
     lv_disp_drv_register(&disp_drv);
 
-    // Build the AI Face UI (Glassmorphism + Neon)
-    lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0x0f2027), 0); // Dark theme
-    lv_obj_set_style_bg_grad_color(lv_scr_act(), lv_color_hex(0x203a43), 0);
-    lv_obj_set_style_bg_grad_dir(lv_scr_act(), LV_GRAD_DIR_VER, 0);
+    // Apple watchOS style deep black background
+    lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0x000000), 0); 
 
-    // Arc visualizer
-    ai_face_arc = lv_arc_create(lv_scr_act());
-    lv_obj_set_size(ai_face_arc, 200, 200);
-    lv_arc_set_rotation(ai_face_arc, 270);
-    lv_arc_set_bg_angles(ai_face_arc, 0, 360);
-    lv_obj_remove_style(ai_face_arc, NULL, LV_PART_KNOB);   // remove knob
-    lv_obj_clear_flag(ai_face_arc, LV_OBJ_FLAG_CLICKABLE);  // not clickable
-    lv_obj_center(ai_face_arc);
+    // Siri-like glowing orb in the center
+    siri_orb = lv_obj_create(lv_scr_act());
+    lv_obj_set_size(siri_orb, 100, 100);
+    lv_obj_center(siri_orb);
+    lv_obj_set_style_radius(siri_orb, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_color(siri_orb, lv_color_hex(0xffffff), 0);
+    lv_obj_set_style_bg_opa(siri_orb, LV_OPA_0, 0); // Hide actual background
+    lv_obj_set_style_border_width(siri_orb, 0, 0);
     
-    // Style the arc
-    lv_obj_set_style_arc_color(ai_face_arc, lv_color_hex(0x00d2ff), LV_PART_INDICATOR);
-    lv_obj_set_style_arc_width(ai_face_arc, 10, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_color(ai_face_arc, lv_color_hex(0x1a2a6c), LV_PART_MAIN);
-    lv_obj_set_style_arc_width(ai_face_arc, 4, LV_PART_MAIN);
+    // Add intense soft shadow to act as the glowing aura
+    lv_obj_set_style_shadow_color(siri_orb, lv_color_hex(0x4287f5), 0); // Apple Siri blue
+    lv_obj_set_style_shadow_width(siri_orb, 60, 0);
+    lv_obj_set_style_shadow_spread(siri_orb, 10, 0);
+    lv_obj_set_style_shadow_opa(siri_orb, LV_OPA_TRANSP, 0); // Hidden initially
 
-    // Status Label
+    // Status Label - San Francisco / Minimalist Style
     status_label = lv_label_create(lv_scr_act());
-    lv_label_set_text(status_label, "ГОТОВ"); // Cyrillic ready
+    lv_label_set_text(status_label, "Готов"); // Cyrillic
     lv_obj_set_style_text_color(status_label, lv_color_hex(0xffffff), 0);
-    lv_obj_center(status_label);
+    lv_obj_set_style_text_opa(status_label, LV_OPA_70, 0); // Frosted/Subtle
+    lv_obj_align(status_label, LV_ALIGN_CENTER, 0, 60); // Offset below orb
 
     ESP_LOGI(TAG, "LVGL setup complete.");
 }
 
 void ui_lvgl_switch_screen(ui_screen_t screen, const char *caller_id) {
-    if (!status_label) return;
+    if (!status_label || !siri_orb) return;
     
     switch(screen) {
         case SCREEN_DIALER:
-            lv_label_set_text(status_label, "НАБОР...");
-            lv_obj_set_style_text_color(status_label, lv_color_hex(0x00d2ff), 0);
-            lv_arc_set_value(ai_face_arc, 50); // Just a visual change
+            lv_label_set_text(status_label, "Набор...");
+            lv_obj_set_style_shadow_color(siri_orb, lv_color_hex(0x34c759), 0); // Apple Green
+            lv_obj_set_style_shadow_opa(siri_orb, LV_OPA_70, 0);
             break;
         case SCREEN_CALLING:
-            lv_label_set_text_fmt(status_label, "ЗВОНОК\n%s", caller_id ? caller_id : "");
-            lv_obj_set_style_text_color(status_label, lv_color_hex(0x3a7bd5), 0);
-            lv_arc_set_value(ai_face_arc, 80);
+            lv_label_set_text_fmt(status_label, "Звонок\n%s", caller_id ? caller_id : "");
+            lv_obj_set_style_shadow_color(siri_orb, lv_color_hex(0x007aff), 0); // Apple Blue
+            lv_obj_set_style_shadow_opa(siri_orb, LV_OPA_100, 0);
             break;
         case SCREEN_INCOMING:
-            lv_label_set_text_fmt(status_label, "ВХОДЯЩИЙ\n%s", caller_id ? caller_id : "");
-            lv_obj_set_style_text_color(status_label, lv_color_hex(0xff0055), 0);
-            lv_arc_set_value(ai_face_arc, 100);
+            lv_label_set_text_fmt(status_label, "Входящий\n%s", caller_id ? caller_id : "");
+            lv_obj_set_style_shadow_color(siri_orb, lv_color_hex(0xff3b30), 0); // Apple Red
+            lv_obj_set_style_shadow_opa(siri_orb, LV_OPA_100, 0);
             break;
     }
 }
 
-// Function to update the visualizer based on audio energy
+// Function to update the orb based on audio energy
 void ui_lvgl_update_energy(uint8_t energy_level) {
-    if(ai_face_arc) {
-        // Map 0-255 energy to 0-100 arc value
-        lv_arc_set_value(ai_face_arc, (energy_level * 100) / 255);
+    if(siri_orb) {
+        // Map 0-255 energy to shadow spread/width for a breathing glow effect
+        lv_coord_t width = 40 + (energy_level / 4);
+        lv_coord_t spread = 5 + (energy_level / 8);
+        lv_obj_set_style_shadow_width(siri_orb, width, 0);
+        lv_obj_set_style_shadow_spread(siri_orb, spread, 0);
     }
 }
 
