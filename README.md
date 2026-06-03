@@ -58,7 +58,7 @@ When Wi-Fi or SIP credentials are missing, the ESP32 hosts an AP (ESP-SIP-Setup)
 ### Call Control Interface & UI Themes
 Once connected to Wi-Fi and registered with your SIP Server, you can control calls via the web interface by visiting the ESP32's assigned IP address. The web interface also allows you to dynamically switch the LVGL GUI Theme on the device!
 
-| Siri-inspired | iOS-style Call Screen | Echo-inspired |
+| Voice Assistant | Mobile OS | Smart Speaker |
 |:---:|:---:|:---:|
 | <img src="assets/theme_siri.png" width="200"/> | <img src="assets/theme_iphone.png" width="200"/> | <img src="assets/theme_echo.png" width="200"/> |
 
@@ -120,8 +120,8 @@ esp32_sip_client/
 
 ## Version History
 * **v2.0.0** - Implemented **Edge AI Voice Activation (Wake Word)**! Integrated the `esp-sr` WakeNet framework. The intercom now continuously listens to the microphone locally (offline) and automatically dials a pre-configured SIP number upon hearing the Wake Word (e.g., "Alexa").
-* **v1.9.0** - Refined **Multi-Theme UI Engine**: The *Echo-inspired* theme now automatically detects screen geometry! Circular displays (e.g. GC9A01) render an **Echo Spot-inspired** aesthetic (clock with outer glowing ring), while rectangular displays (e.g. ST7789) render an **Echo Show-inspired** aesthetic (dashboard cards with a bottom glowing light bar).
-* **v1.8.0** - Implemented **Multi-Theme LVGL UI Engine** for circular displays (GC9A01) and traditional screens. Includes 3 dynamically switchable aesthetics via the Web UI: Apple Siri-inspired (Glowing Orb), iOS-style Call Screen (Glassmorphism), and Amazon Echo-inspired (Edge Ring). Fully localized font mapping supporting multi-language phonebooks (including Cyrillic).
+* **v1.9.0** - Refined **Multi-Theme UI Engine**: The *Smart Speaker* theme now automatically detects screen geometry! Circular displays (e.g. GC9A01) render a **Minimalist Clock** aesthetic (clock with outer glowing ring), while rectangular displays (e.g. ST7789) render a **Dashboard** aesthetic (cards with a bottom glowing light bar).
+* **v1.8.0** - Implemented **Multi-Theme LVGL UI Engine** for circular displays (GC9A01) and traditional screens. Includes 3 dynamically switchable aesthetics via the Web UI: Glowing Orb (Voice Assistant style), Glassmorphism (Mobile OS style), and Edge Ring (Smart Speaker style). Fully localized font mapping supporting multi-language phonebooks (including Cyrillic).
 * **v1.7.0** - Added **Dynamic Hardware Config Engine**. Change GPIO pins for I2S, SPI, and I2C via the Web Interface and store them in NVS. Flash once, configure anywhere!
 * **v1.6.0** - Introduced **Tier Architecture** via `Kconfig.projbuild` (LITE, STANDARD, PRO) to support C3/S3 chips gracefully. Implemented a massive **PSRAM-backed Jitter Buffer** for WROVER/S3 chips to eliminate RTP network stuttering.
 * **v1.5.0** - Added HD Voice (G.722 Codec) integration. Implemented automatic SDP codec negotiation (fallback from G.722 to PCMA/PCMU) and dynamic I2S sample rate switching (16 kHz / 8 kHz).
