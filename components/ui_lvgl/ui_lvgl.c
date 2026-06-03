@@ -1,10 +1,16 @@
 #include "ui_lvgl.h"
-#include "esp_log.h"
-#include "config_manager.h"
 
-// Check if LVGL is available via component manager
+// LVGL is present both on-device (managed component) and in the PC simulator
+// (FetchContent). The ESP-only platform glue is guarded by ESP_PLATFORM so the
+// exact same theme code can be previewed in simulator/ with SDL.
 #if __has_include("lvgl.h")
 #include "lvgl.h"
+#include <time.h>
+#include <stdio.h>
+
+#ifdef ESP_PLATFORM
+#include "esp_log.h"
+#include "config_manager.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_heap_caps.h"
 #include "esp_timer.h"
@@ -13,10 +19,19 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
-#include <time.h>
-#include <stdio.h>
-
 extern esp_lcd_panel_handle_t panel_handle; // from display_tft.c
+#else
+// ---- PC simulator shims (no ESP-IDF) ----
+#define ESP_LOGI(tag, ...) do { printf("[%s] ", tag); printf(__VA_ARGS__); printf("\n"); } while (0)
+#define ESP_LOGW ESP_LOGI
+#define ESP_LOGE ESP_LOGI
+#ifndef SIM_THEME
+#define SIM_THEME 0     // 0=Voice Assistant, 1=Mobile OS, 2=Smart Speaker
+#endif
+#ifndef SIM_ROUND
+#define SIM_ROUND 0     // 1 = preview as a round (GC9A01-style) panel
+#endif
+#endif
 
 static const char *TAG = "UI_LVGL";
 
@@ -49,64 +64,68 @@ static const char *TAG = "UI_LVGL";
 #  define FONT_M LV_FONT_DEFAULT
 #endif
 
-// ---- display / driver state ----
+// ---- state ----
+static int disp_w = 240, disp_h = 240;
+static bool is_round = true;
+static uint8_t current_theme = 0;
+static bool   s_registered = false;
+static ui_screen_t s_screen = SCREEN_IDLE;
+static ui_action_cb_t s_answer_cb = NULL;
+static ui_action_cb_t s_hangup_cb = NULL;
+
+#ifdef ESP_PLATFORM
 static lv_disp_draw_buf_t disp_buf;
 static lv_color_t *buf1;
 static lv_disp_drv_t disp_drv;
 static SemaphoreHandle_t lvgl_mux = NULL;
-static int disp_w = 240, disp_h = 240;
-static bool is_round = true;
+#endif
 
-static uint8_t current_theme = 0;   // 0=Voice Assistant, 1=Mobile OS, 2=Smart Speaker
-static bool   s_registered = false;
-static ui_screen_t s_screen = SCREEN_IDLE;
-
-static ui_action_cb_t s_answer_cb = NULL;
-static ui_action_cb_t s_hangup_cb = NULL;
-
-// ---- shared widgets ----
-static lv_obj_t *clock_label;   // HH:MM
-static lv_obj_t *date_label;    // weekday / date
-static lv_obj_t *sub_label;     // status line (registration / context)
-static lv_obj_t *center_widget; // orb (VA) / avatar (Mobile) / ring (Echo)
-static lv_obj_t *avatar_head;   // Mobile avatar inner
-static lv_obj_t *caller_label;  // caller id / target
-static lv_obj_t *state_label;   // "Speak Now" / "Incoming" / "Active"
+// ---- widgets ----
+static lv_obj_t *clock_label;
+static lv_obj_t *date_label;
+static lv_obj_t *sub_label;
+static lv_obj_t *center_widget;
+static lv_obj_t *avatar_head;
+static lv_obj_t *caller_label;
+static lv_obj_t *state_label;
 static lv_obj_t *btn_answer;
 static lv_obj_t *btn_end;
 
-// ===== LVGL plumbing =====
+// ===== LVGL plumbing (thread-safety only matters on the RTOS target) =====
 bool ui_lvgl_lock(int timeout_ms) {
+#ifdef ESP_PLATFORM
     if (!lvgl_mux) return true;
     TickType_t to = (timeout_ms < 0) ? portMAX_DELAY : pdMS_TO_TICKS(timeout_ms);
     return xSemaphoreTakeRecursive(lvgl_mux, to) == pdTRUE;
+#else
+    (void)timeout_ms; return true;
+#endif
 }
 void ui_lvgl_unlock(void) {
+#ifdef ESP_PLATFORM
     if (lvgl_mux) xSemaphoreGiveRecursive(lvgl_mux);
+#endif
 }
 
+#ifdef ESP_PLATFORM
 static void flush_cb(lv_disp_drv_t *drv, const lv_area_t *area, lv_color_t *color_map) {
     if (panel_handle) {
         esp_lcd_panel_draw_bitmap(panel_handle, area->x1, area->y1, area->x2 + 1, area->y2 + 1, color_map);
     }
     lv_disp_flush_ready(drv);
 }
-
 static void lvgl_tick_cb(void *arg) { (void)arg; lv_tick_inc(2); }
 
-// Touch input device: bridges the XPT2046 driver to LVGL.
 static void touch_read_cb(lv_indev_drv_t *drv, lv_indev_data_t *data) {
     (void)drv;
     int16_t x = 0, y = 0;
     if (touch_driver_read(&x, &y)) {
         data->state = LV_INDEV_STATE_PRESSED;
-        data->point.x = x;
-        data->point.y = y;
+        data->point.x = x; data->point.y = y;
     } else {
         data->state = LV_INDEV_STATE_RELEASED;
     }
 }
-
 static void lvgl_task(void *arg) {
     (void)arg;
     while (1) {
@@ -114,6 +133,7 @@ static void lvgl_task(void *arg) {
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
+#endif // ESP_PLATFORM
 
 // ===== helpers =====
 static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font, lv_color_t color) {
@@ -127,9 +147,7 @@ static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font, lv_color_t 
 static void btn_answer_event(lv_event_t *e) { (void)e; if (s_answer_cb) s_answer_cb(); }
 static void btn_end_event(lv_event_t *e)    { (void)e; if (s_hangup_cb) s_hangup_cb(); }
 
-// Build the call-control buttons (shared across themes).
 static void build_buttons(void) {
-    // Answer (green, phone icon)
     btn_answer = lv_btn_create(lv_scr_act());
     lv_obj_set_size(btn_answer, 64, 64);
     lv_obj_set_style_radius(btn_answer, LV_RADIUS_CIRCLE, 0);
@@ -142,7 +160,6 @@ static void build_buttons(void) {
     lv_obj_set_style_text_color(al, lv_color_white(), 0);
     lv_obj_center(al);
 
-    // End / Decline (red)
     btn_end = lv_btn_create(lv_scr_act());
     lv_obj_set_size(btn_end, 64, 64);
     lv_obj_set_style_radius(btn_end, LV_RADIUS_CIRCLE, 0);
@@ -162,12 +179,9 @@ static void build_theme(void) {
     lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), 0);
     lv_obj_clear_flag(scr, LV_OBJ_FLAG_SCROLLABLE);
 
-    int cx = disp_w / 2;
-
     if (current_theme == 2) {
         // ---- Smart Speaker: neon ring + big clock ----
-        lv_obj_set_style_bg_color(scr, lv_color_hex(0x000000), 0);
-        center_widget = lv_arc_create(scr);            // glowing outer ring
+        center_widget = lv_arc_create(scr);
         lv_obj_set_size(center_widget, disp_w - 6, disp_h - 6);
         lv_obj_center(center_widget);
         lv_arc_set_rotation(center_widget, 270);
@@ -187,7 +201,6 @@ static void build_theme(void) {
         lv_obj_align(date_label, LV_ALIGN_CENTER, 0, 34);
         sub_label = make_label(scr, FONT_M, lv_color_hex(0x888888));
         lv_obj_align(sub_label, LV_ALIGN_CENTER, 0, 58);
-        // Call info (shown instead of the clock while in a call).
         caller_label = make_label(scr, FONT_L, lv_color_white());
         lv_obj_align(caller_label, LV_ALIGN_CENTER, 0, -14);
         state_label = make_label(scr, FONT_M, lv_color_hex(0xcccccc));
@@ -198,13 +211,13 @@ static void build_theme(void) {
         lv_obj_set_style_bg_grad_color(scr, lv_color_hex(0x1a2a6c), 0);
         lv_obj_set_style_bg_grad_dir(scr, LV_GRAD_DIR_VER, 0);
 
-        center_widget = lv_obj_create(scr);            // avatar disc
+        center_widget = lv_obj_create(scr);
         lv_obj_set_size(center_widget, 76, 76);
         lv_obj_align(center_widget, LV_ALIGN_TOP_MID, 0, is_round ? 40 : 30);
         lv_obj_set_style_radius(center_widget, LV_RADIUS_CIRCLE, 0);
         lv_obj_set_style_bg_color(center_widget, lv_color_hex(0x9098a8), 0);
         lv_obj_set_style_border_width(center_widget, 0, 0);
-        avatar_head = lv_obj_create(center_widget);    // head dot
+        avatar_head = lv_obj_create(center_widget);
         lv_obj_set_size(avatar_head, 26, 26);
         lv_obj_align(avatar_head, LV_ALIGN_CENTER, 0, -6);
         lv_obj_set_style_radius(avatar_head, LV_RADIUS_CIRCLE, 0);
@@ -217,7 +230,6 @@ static void build_theme(void) {
         lv_obj_align(state_label, LV_ALIGN_CENTER, 0, 24);
         sub_label = make_label(scr, FONT_M, lv_color_hex(0x8893a8));
         lv_obj_align(sub_label, LV_ALIGN_CENTER, 0, 46);
-        // small clock top
         clock_label = make_label(scr, FONT_M, lv_color_hex(0xaaaaaa));
         lv_obj_align(clock_label, LV_ALIGN_TOP_MID, 0, is_round ? 14 : 6);
         date_label = NULL;
@@ -232,7 +244,7 @@ static void build_theme(void) {
         date_label = make_label(scr, FONT_M, lv_color_hex(0xbbbbbb));
         lv_obj_align(date_label, LV_ALIGN_TOP_MID, 0, is_round ? 70 : 50);
 
-        center_widget = lv_obj_create(scr);            // Siri-like orb
+        center_widget = lv_obj_create(scr);
         lv_obj_set_size(center_widget, 84, 84);
         lv_obj_center(center_widget);
         lv_obj_set_style_radius(center_widget, LV_RADIUS_CIRCLE, 0);
@@ -254,7 +266,6 @@ static void build_theme(void) {
     build_buttons();
 }
 
-// Position the call buttons for a given layout (1 or 2 visible).
 static void layout_buttons(bool two) {
     int y = is_round ? -28 : -16;
     if (two) {
@@ -304,12 +315,11 @@ static void clock_update(void) {
 
 static void clock_timer_cb(lv_timer_t *t) { (void)t; clock_update(); }
 
-// ===== screen state application (assumes lock held) =====
+// ===== screen state (assumes lock held) =====
 static void apply_screen(ui_screen_t screen, const char *caller_id) {
     s_screen = screen;
     bool in_call = (screen != SCREEN_IDLE);
 
-    // Clock visible on idle (and as a small element on Mobile during call).
     if (clock_label) {
         if (current_theme == 1) lv_obj_clear_flag(clock_label, LV_OBJ_FLAG_HIDDEN);
         else if (in_call) lv_obj_add_flag(clock_label, LV_OBJ_FLAG_HIDDEN);
@@ -331,7 +341,6 @@ static void apply_screen(ui_screen_t screen, const char *caller_id) {
     if (state_label) lv_label_set_text(state_label, state_txt);
     if (caller_label) lv_label_set_text(caller_label, (in_call && caller_id) ? caller_id : "");
 
-    // Buttons
     if (btn_answer && btn_end) {
         if (screen == SCREEN_INCOMING)      layout_buttons(true);
         else if (screen == SCREEN_CALLING || screen == SCREEN_DIALER || screen == SCREEN_ACTIVE)
@@ -339,7 +348,6 @@ static void apply_screen(ui_screen_t screen, const char *caller_id) {
         else                                hide_buttons();
     }
 
-    // Central widget accent colour per state
     lv_color_t accent = (screen == SCREEN_INCOMING) ? lv_color_hex(0xff3b30)
                       : (screen == SCREEN_ACTIVE)   ? lv_color_hex(0x34c759)
                                                     : lv_color_hex(0x00aaff);
@@ -350,7 +358,6 @@ static void apply_screen(ui_screen_t screen, const char *caller_id) {
         lv_obj_set_style_shadow_color(center_widget, accent, 0);
     }
 
-    // Idle status line
     if (sub_label && !in_call) {
         lv_label_set_text(sub_label, s_registered ? LV_SYMBOL_OK " Online" : LV_SYMBOL_WARNING " Offline");
         lv_obj_clear_flag(sub_label, LV_OBJ_FLAG_HIDDEN);
@@ -365,6 +372,7 @@ static void apply_screen(ui_screen_t screen, const char *caller_id) {
 void ui_lvgl_init(void) {
     ESP_LOGI(TAG, "Initializing LVGL Interface...");
 
+#ifdef ESP_PLATFORM
     hardware_settings_t hw;
     if (config_manager_load_hw(&hw) == ESP_OK) current_theme = hw.ui_theme;
     if (current_theme > 2) current_theme = 0;
@@ -388,8 +396,6 @@ void ui_lvgl_init(void) {
     disp_drv.draw_buf = &disp_buf;
     lv_disp_drv_register(&disp_drv);
 
-    // Touch input device (XPT2046). Buttons need this; calibrate the raw bounds
-    // in app_config.h (TOUCH_X_MIN/MAX, TOUCH_Y_MIN/MAX, TOUCH_SWAP_XY...).
     static lv_indev_drv_t indev_drv;
     lv_indev_drv_init(&indev_drv);
     indev_drv.type = LV_INDEV_TYPE_POINTER;
@@ -401,13 +407,24 @@ void ui_lvgl_init(void) {
     if (esp_timer_create(&tick_args, &tick_timer) == ESP_OK) {
         esp_timer_start_periodic(tick_timer, 2 * 1000);
     }
+#else
+    // Simulator: lv_init(), the SDL display and the mouse indev are set up by
+    // simulator/main.c. Take theme/geometry from build defines, and read the
+    // resolution back from the display SDL already registered.
+    current_theme = SIM_THEME;
+    is_round = SIM_ROUND ? true : false;
+    lv_disp_t *d = lv_disp_get_default();
+    if (d) { disp_w = lv_disp_get_hor_res(d); disp_h = lv_disp_get_ver_res(d); }
+#endif
 
     build_theme();
     apply_screen(SCREEN_IDLE, NULL);
     clock_update();
     lv_timer_create(clock_timer_cb, 1000, NULL);
 
+#ifdef ESP_PLATFORM
     xTaskCreate(lvgl_task, "lvgl", 6144, NULL, 4, NULL);
+#endif
     ESP_LOGI(TAG, "LVGL ready. Theme %d, %dx%d, round=%d", current_theme, disp_w, disp_h, is_round);
 }
 
@@ -441,9 +458,9 @@ void ui_lvgl_update_energy(uint8_t energy_level) {
     ui_lvgl_unlock();
 }
 
-#else
+#else // no LVGL at all (on-device build without the lvgl component)
 
-// Placeholder if LVGL is not installed
+#include "esp_log.h"
 static const char *TAG = "UI_LVGL";
 void ui_lvgl_init(void) { ESP_LOGW(TAG, "LVGL not found! Skipping UI init."); }
 void ui_lvgl_set_action_cb(ui_action_cb_t answer_cb, ui_action_cb_t hangup_cb) { (void)answer_cb; (void)hangup_cb; }

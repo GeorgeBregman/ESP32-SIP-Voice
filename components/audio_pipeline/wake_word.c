@@ -2,7 +2,7 @@
 //
 // Offline wake-word detection using esp-sr WakeNet (API v2.x model loader).
 // Models are stored in a `model` flash partition and loaded at runtime via
-// esp_srmodel_init(); select the keyword with WAKE_WORD_MODEL (e.g. "alexa").
+// esp_srmodel_init(); select the keyword with WAKE_WORD_MODEL (e.g. "computer").
 #include "wake_word.h"
 #include "app_config.h"
 #include "esp_log.h"

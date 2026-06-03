@@ -34,7 +34,7 @@ typedef struct {
     int8_t pin_touch_irq;
     
     // UI Settings
-    uint8_t ui_theme; // 0=Siri, 1=iPhone, 2=Echo
+    uint8_t ui_theme; // 0=Voice Assistant, 1=Mobile OS, 2=Smart Speaker
 } hardware_settings_t;
 
 esp_err_t config_manager_init(void);
