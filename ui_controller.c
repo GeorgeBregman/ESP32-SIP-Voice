@@ -210,8 +210,9 @@ static esp_err_t hardware_get_handler(httpd_req_t *req) {
     hardware_settings_t hw;
     config_manager_load_hw(&hw);
 
-    snprintf(resp_str, 4096, "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>ESP32 SIP Hardware Config</title><style>body{font-family:sans-serif;background:#222;color:#eee;} .c{max-width:400px;margin:auto;background:#333;padding:20px;border-radius:10px;} input{width:100%%;margin-bottom:10px;} button{width:100%%;padding:10px;}</style></head><body><div class='c'><h2>HW Config</h2><form method='POST' action='/hardware'><label>I2S BCK:</label><input type='number' name='bck' value='%d'><br><label>I2S WS:</label><input type='number' name='ws' value='%d'><br><label>I2S DOUT:</label><input type='number' name='dout' value='%d'><br><label>I2S DIN:</label><input type='number' name='din' value='%d'><br><label>I2S MCLK:</label><input type='number' name='mclk' value='%d'><br><label>I2C SDA:</label><input type='number' name='sda' value='%d'><br><label>I2C SCL:</label><input type='number' name='scl' value='%d'><br><button type='submit'>Save</button></form></div></body></html>",
-        hw.pin_i2s_bck, hw.pin_i2s_ws, hw.pin_i2s_dout, hw.pin_i2s_din, hw.pin_i2s_mclk, hw.pin_i2c_sda, hw.pin_i2c_scl);
+    snprintf(resp_str, 4096, "<!DOCTYPE html><html><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1'><title>ESP32 SIP Hardware Config</title><style>body{font-family:sans-serif;background:#222;color:#eee;} .c{max-width:400px;margin:auto;background:#333;padding:20px;border-radius:10px;} input,select{width:100%%;margin-bottom:10px;} button{width:100%%;padding:10px;}</style></head><body><div class='c'><h2>HW Config</h2><form method='POST' action='/hardware'><label>I2S BCK:</label><input type='number' name='bck' value='%d'><br><label>I2S WS:</label><input type='number' name='ws' value='%d'><br><label>I2S DOUT:</label><input type='number' name='dout' value='%d'><br><label>I2S DIN:</label><input type='number' name='din' value='%d'><br><label>I2S MCLK:</label><input type='number' name='mclk' value='%d'><br><label>I2C SDA:</label><input type='number' name='sda' value='%d'><br><label>I2C SCL:</label><input type='number' name='scl' value='%d'><br><h3>UI Theme</h3><select name='ui_theme'><option value='0' %s>Apple Siri</option><option value='1' %s>iPhone Call</option><option value='2' %s>Amazon Echo</option></select><br><br><button type='submit'>Save</button></form></div></body></html>",
+        hw.pin_i2s_bck, hw.pin_i2s_ws, hw.pin_i2s_dout, hw.pin_i2s_din, hw.pin_i2s_mclk, hw.pin_i2c_sda, hw.pin_i2c_scl,
+        hw.ui_theme == 0 ? "selected" : "", hw.ui_theme == 1 ? "selected" : "", hw.ui_theme == 2 ? "selected" : "");
 
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
     free(resp_str);
@@ -239,6 +240,7 @@ static esp_err_t hardware_post_handler(httpd_req_t *req) {
             else if (strcmp(p, "mclk") == 0) hw.pin_i2s_mclk = atoi(v);
             else if (strcmp(p, "sda") == 0) hw.pin_i2c_sda = atoi(v);
             else if (strcmp(p, "scl") == 0) hw.pin_i2c_scl = atoi(v);
+            else if (strcmp(p, "ui_theme") == 0) hw.ui_theme = atoi(v);
         }
         p = strtok(NULL, "&");
     }

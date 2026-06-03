@@ -84,6 +84,7 @@ esp_err_t config_manager_load_hw(hardware_settings_t *hw_settings) {
     hw_settings->pin_tft_rst = -1;
     hw_settings->pin_touch_cs = -1;
     hw_settings->pin_touch_irq = -1;
+    hw_settings->ui_theme = 0;
 
     err = nvs_open(STORAGE_NAMESPACE, NVS_READONLY, &my_handle);
     if (err != ESP_OK) {
