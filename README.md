@@ -93,7 +93,7 @@ esp32_sip_client/
 *   **SIPS (TLS) Completion:** The foundation for SIP over TLS (esp_tls_t) has been conditionally added (USE_SIPS), but requires proper certificate provisioning and server-side testing to fully implement secure SIP signaling.
 *   **Full-Duplex AEC (Acoustic Echo Cancellation):** We have implemented half-duplex Echo Suppression (speaker attenuation), which is perfect for the ESP32-C3. For true full-duplex AEC (simultaneous speaking), integration with DSP libraries (like ESP-ADF) is required.
 *   **Dynamic Codec Negotiation:** Expanding the SDP parser to parse 
-tpmap dynamically and negotiate codecs like G.722 (HD Voice) or OPUS, rather than defaulting to G.711 µ-law.
+tpmap dynamically and negotiate codecs like OPUS, rather than defaulting to G.711 µ-law (or G.722).
 *   **Hardware Validation:** Testing the I2C OLED (SSD1306), Captive Portal, and I2S codecs together on a physical prototype or custom PCB.
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
