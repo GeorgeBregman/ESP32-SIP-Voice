@@ -1,0 +1,25 @@
+# ===== ESP32-SIP-Voice default project configuration =====
+# Override per-board with `idf.py menuconfig`.
+
+# Custom partition table (factory app + WakeNet model partition)
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# 8 MB flash assumed (needed for the WakeNet model partition). Drop to your
+# board's size if you disable wake word.
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+
+# 1 kHz tick -> accurate 20 ms audio framing (pdMS_TO_TICKS(20) == 20 ticks).
+CONFIG_FREERTOS_HZ=1000
+
+# Bigger main task stack for init of audio + SIP + UI.
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192
+
+# esp-sr: load WakeNet models from the SPIFFS "model" partition.
+CONFIG_MODEL_IN_SPIFFS=y
+
+# ---- Recommended for STANDARD/PRO tiers (boards WITH PSRAM) ----
+# Uncomment on ESP32-WROVER / ESP32-S3 modules that have external PSRAM so the
+# large jitter buffer and (PRO) OPUS/AEC have room.
+# CONFIG_SPIRAM=y
+# CONFIG_SPIRAM_USE_MALLOC=y

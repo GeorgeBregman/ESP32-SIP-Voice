@@ -4,6 +4,8 @@
 #include "freertos/event_groups.h"
 #include "esp_system.h"
 #include "esp_log.h"
+#include "esp_netif.h"
+#include "esp_event.h"
 #include "nvs_flash.h"
 
 #include "wifi_manager.h"
@@ -21,11 +23,10 @@
 
 static const char *TAG = "MAIN";
 
-// Event group to signal application state
+// Event group to signal application state.
+// (WIFI_CONNECTED_BIT / SIP_REGISTERED_BIT / IP_ACQUIRED_BIT are defined
+//  centrally in app_config.h so every module agrees on them.)
 EventGroupHandle_t app_event_group;
-#define WIFI_CONNECTED_BIT  BIT0
-#define SIP_REGISTERED_BIT  BIT1
-#define IP_ACQUIRED_BIT     BIT2 // Added for clarity
 
 // Shared handles (if needed across modules, though better passed as params)
 sip_client_handle_t g_sip_client = NULL;

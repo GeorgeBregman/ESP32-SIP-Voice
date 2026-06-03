@@ -6,7 +6,8 @@
 #include <string.h>
 
 static const char *TAG = "CONFIG";
-static const char *NVS_NAMESPACE = "sip_phone";
+static const char *NVS_NAMESPACE = "sip_phone";     // Wi-Fi / SIP credentials
+static const char *STORAGE_NAMESPACE = "hw_config"; // GPIO / hardware + UI theme
 
 esp_err_t config_manager_init(void) {
     esp_err_t err = nvs_flash_init();
