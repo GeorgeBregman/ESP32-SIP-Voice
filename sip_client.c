@@ -571,22 +571,42 @@ static void send_register(sip_client_t *client, bool initial_registration) {
 static int generate_sdp(sip_client_t *client, char *buffer, size_t buffer_len) {
      // Basic SDP offering G.711 u-law on the configured RTP port
      // TODO: Get actual local IP if different from SIP signaling IP
+#ifdef USE_CODEC_G722
      return snprintf(buffer, buffer_len,
                 "v=0\r\n"
-                "o=%s %lu %lu IN IP4 %s\r\n" // user, session id, version, network type, addr type, addr
+                "o=%s %lu %lu IN IP4 %s\r\n"
                 "s=ESP32 Call\r\n"
-                "c=IN IP4 %s\r\n"            // connection network type, addr type, addr
+                "c=IN IP4 %s\r\n"
                 "t=0 0\r\n"
-                "m=audio %d RTP/AVP %d\r\n"   // media type, port, proto, payload type(s)
-                "a=rtpmap:%d PCMU/%d\r\n"    // payload type, encoding name, clock rate
-                "a=ptime:%d\r\n"              // packet time
-                "a=sendrecv\r\n",             // or sendonly/recvonly
-                client->user, esp_random(), esp_random(), client->local_ip_str, // session origin
-                client->local_ip_str,                                           // connection address
-                client->local_rtp_port, AUDIO_CODEC_PAYLOAD_TYPE,               // media line (port, PT)
-                AUDIO_CODEC_PAYLOAD_TYPE, AUDIO_SAMPLE_RATE,                    // rtpmap line
-                AUDIO_FRAME_MS                                                  // ptime line
+                "m=audio %d RTP/AVP 9 8 0\r\n"
+                "a=rtpmap:9 G722/8000\r\n"
+                "a=rtpmap:8 PCMA/8000\r\n"
+                "a=rtpmap:0 PCMU/8000\r\n"
+                "a=ptime:%d\r\n"
+                "a=sendrecv\r\n",
+                client->user, esp_random(), esp_random(), client->local_ip_str,
+                client->local_ip_str,
+                client->local_rtp_port,
+                AUDIO_FRAME_MS
             );
+#else
+     return snprintf(buffer, buffer_len,
+                "v=0\r\n"
+                "o=%s %lu %lu IN IP4 %s\r\n"
+                "s=ESP32 Call\r\n"
+                "c=IN IP4 %s\r\n"
+                "t=0 0\r\n"
+                "m=audio %d RTP/AVP %d\r\n"
+                "a=rtpmap:%d PCMU/%d\r\n"
+                "a=ptime:%d\r\n"
+                "a=sendrecv\r\n",
+                client->user, esp_random(), esp_random(), client->local_ip_str,
+                client->local_ip_str,
+                client->local_rtp_port, AUDIO_CODEC_PAYLOAD_TYPE,
+                AUDIO_CODEC_PAYLOAD_TYPE, AUDIO_SAMPLE_RATE,
+                AUDIO_FRAME_MS
+            );
+#endif
 }
 
 static void send_invite(sip_client_t *client, const char *target_uri) {
@@ -820,12 +840,17 @@ static bool parse_sdp(const char *sdp_body, ip_addr_t *remote_ip, uint16_t *remo
          if (sscanf(m_line, "%*[^ ] %u RTP/AVP %u", &port, &payload_type) >= 1) { // Payload type is optional here
              *remote_port = (uint16_t)port;
              ESP_LOGI(TAG, "SDP parsed remote port: %u, Payload Type: %u", *remote_port, payload_type);
-             // TODO: Validate payload type against our supported codecs (e.g., == AUDIO_CODEC_PAYLOAD_TYPE)
-             if (payload_type != AUDIO_CODEC_PAYLOAD_TYPE) {
+#ifdef USE_CODEC_G722
+             if (payload_type != 9 && payload_type != 8 && payload_type != 0) {
                  ESP_LOGW(TAG, "Unsupported payload type %u received in SDP.", payload_type);
-                 // Cannot establish call with this media format
                  return false;
              }
+#else
+             if (payload_type != AUDIO_CODEC_PAYLOAD_TYPE) {
+                 ESP_LOGW(TAG, "Unsupported payload type %u received in SDP.", payload_type);
+                 return false;
+             }
+#endif
          } else {
              ESP_LOGW(TAG, "Could not parse port from SDP m-line: %s", m_line);
              return false; // Port is essential

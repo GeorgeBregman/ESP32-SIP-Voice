@@ -73,6 +73,15 @@
 #define TOUCH_CS   GPIO_NUM_14 // Usually shares SPI with TFT, just needs its own CS
 #define TOUCH_IRQ  GPIO_NUM_27 // Interrupt pin
 
+// --- Audio & Codec Configuration ---
+#define USE_CODEC_G722 // Uncomment to enable HD Voice (16kHz). If commented, uses G.711 (8kHz)
+
+#ifdef USE_CODEC_G722
+#define AUDIO_SAMPLE_RATE       16000
+#else
+#define AUDIO_SAMPLE_RATE       8000
+#endif
+
 // --- Task Configuration ---
 #define WIFI_TASK_PRIORITY      5
 #define SIP_TASK_PRIORITY       8               // Higher than WiFi, lower than audio
