@@ -155,6 +155,10 @@ void app_main(void) {
         ui_controller_init(g_sip_client, &g_app_settings);
     }
 
+    if (g_audio_pipeline) {
+        audio_pipeline_set_wake_word_cb(g_audio_pipeline, ui_controller_wake_word_trigger);
+    }
+
     // Create application control task (optional, but good for managing overall state)
     xTaskCreate(app_control_task, "app_ctrl", 4096, NULL, 6, NULL);
 

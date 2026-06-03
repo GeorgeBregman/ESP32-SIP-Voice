@@ -302,3 +302,13 @@ esp_err_t ui_controller_init(sip_client_handle_t sip_client, app_settings_t *set
 #endif
     return ESP_OK;
 }
+
+void ui_controller_wake_word_trigger(void) {
+    if (g_sip_client) {
+        sip_call_state_t st = sip_client_get_call_state(g_sip_client);
+        if (st == SIP_CALL_STATE_IDLE) {
+            ESP_LOGI(TAG, "Wake word triggered! Initiating call...");
+            sip_client_initiate_call(g_sip_client, SIP_TARGET_URI);
+        }
+    }
+}

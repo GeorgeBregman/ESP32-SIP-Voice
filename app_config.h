@@ -14,6 +14,13 @@
 #define SIP_DISPLAY_NAME       "ESP32 Phone"
 #define SIP_DOMAIN             SIP_SERVER_IP   // Often same as server IP/domain
 #define SIP_LOCAL_PORT         5060            // Local port for SIP UDP socket
+// ==========================================
+// AI & VOICE ACTIVATION CONFIGURATION
+// ==========================================
+#define USE_WAKE_WORD 1 // Enable esp-sr WakeNet (Requires ESP32-S3 or PSRAM)
+#define WAKE_WORD_MODEL "alexa" // Wake word model name
+
+// ==========================================
 #define SIP_REGISTRATION_EXPIRY 3600           // Registration duration in seconds
 #define SIP_RETRY_INTERVAL_MS  5000            // Interval to retry registration on failure
 #define USE_SIPS 0 // Set to 1 to enable SIP over TLS (SIPS)

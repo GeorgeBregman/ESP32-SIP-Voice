@@ -13,6 +13,7 @@ esp_err_t audio_pipeline_start(audio_pipeline_handle_t handle, uint16_t local_rt
 esp_err_t audio_pipeline_stop(audio_pipeline_handle_t handle);
 void audio_pipeline_delete(audio_pipeline_handle_t handle);
 void audio_pipeline_set_sip_handle(audio_pipeline_handle_t handle, sip_client_handle_t sip_handle); // Link SIP client
+void audio_pipeline_set_wake_word_cb(audio_pipeline_handle_t handle, void (*cb)(void));
 
 #endif // AUDIO_PIPELINE_H
 
@@ -29,6 +30,7 @@ void audio_pipeline_set_sip_handle(audio_pipeline_handle_t handle, sip_client_ha
 #include "g711_codec.h"
 #include "rtp_handler.h"
 #include "codec_driver.h" // Include your specific codec driver header
+#include "wake_word.h"
 
 static const char* TAG = "AUDIO";
 
@@ -46,6 +48,8 @@ typedef struct audio_pipeline_s {
     uint8_t encoded_buffer[AUDIO_SAMPLES_PER_FRAME]; // G711 encoded
     uint8_t rtp_receive_buffer[RTP_RX_BUFFER_SIZE];
     uint8_t decoded_buffer[AUDIO_SAMPLES_PER_FRAME]; // G711 decoded
+
+    void (*wake_word_callback)(void);
 
 } audio_pipeline_t;
 
@@ -89,8 +93,19 @@ audio_pipeline_handle_t audio_pipeline_init(void) {
         return NULL;
     }
 
+#if USE_WAKE_WORD
+    wake_word_init();
+#endif
+
     ESP_LOGI(TAG, "Audio pipeline initialized.");
     return pipeline;
+}
+
+void audio_pipeline_set_wake_word_cb(audio_pipeline_handle_t handle, void (*cb)(void)) {
+    audio_pipeline_t* pipeline = (audio_pipeline_t*)handle;
+    if (pipeline) {
+        pipeline->wake_word_callback = cb;
+    }
 }
 
 void audio_pipeline_set_sip_handle(audio_pipeline_handle_t handle, sip_client_handle_t sip_handle) {
@@ -318,11 +333,24 @@ static void audio_io_task(void* pvParameters) {
             vTaskDelayUntil(&last_wake_time, ticks_per_frame);
 
         } else {
+            // Pipeline is not in a call. Read from mic for Wake Word!
+#if USE_WAKE_WORD
+            i2s_status = i2s_read(I2S_NUM, pipeline->i2s_read_buffer, AUDIO_SAMPLES_PER_FRAME, &bytes_read, pdMS_TO_TICKS(AUDIO_FRAME_MS*2));
+            if (i2s_status == ESP_OK && bytes_read == AUDIO_SAMPLES_PER_FRAME) {
+                if (wake_word_feed((int16_t*)pipeline->i2s_read_buffer, bytes_read)) {
+                    if (pipeline->wake_word_callback) {
+                        pipeline->wake_word_callback();
+                    }
+                }
+            }
+            vTaskDelayUntil(&last_wake_time, ticks_per_frame);
+#else
             // Pipeline is stopped, wait to be started
             remote_info_valid = false; // Reset remote info when stopped
             current_timestamp = 0;     // Reset timestamp
             vTaskDelay(pdMS_TO_TICKS(100)); // Sleep longer when inactive
             last_wake_time = xTaskGetTickCount(); // Reset wake time for next start
+#endif
         }
     } // End while(1)
 }
