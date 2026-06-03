@@ -1,5 +1,5 @@
 {
   "artifactType":  "ARTIFACT_TYPE_OTHER",
-  "summary":  "TFT display driver implementation",
-  "updatedAt":  "2026-06-03T11:04:31.094061900Z"
+  "summary":  "Implement esp_lcd gc9a01 initialization",
+  "updatedAt":  "2026-06-03T17:52:58.432059400Z"
 }

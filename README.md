@@ -30,13 +30,21 @@ To ensure the firmware runs optimally across various Espressif chips without mem
 While this project is designed to be highly portable across ESP-IDF versions and ESP32 hardware, the following environments are supported (but not strictly limited to):
 
 *   **ESP-IDF Versions**: v4.4, v5.0, v5.1+
-*   **Supported Hardware**: 
-    *   ESP32 (Classic dual-core)
-    *   ESP32-S2, ESP32-S3
-    *   ESP32-C3 (RISC-V single-core, with Half-Duplex AEC)
+*   **Supported Chips**: 
+    *   ESP32 (Classic dual-core WROVER/WROOM)
+    *   ESP32-S2, ESP32-S3 (With PSRAM and Vector instructions for AI)
+    *   ESP32-C3 (RISC-V single-core, for LITE profile)
+*   **Supported Boards (Thanks to Dynamic GPIO Config)**:
+    *   M5Stack (Core, Core2, Dial)
+    *   LilyGo (T-Display, T-Embed)
+    *   Waveshare (ESP32-S3-Touch-LCD series)
+    *   Guition, Spotpear, and 70+ other generic boards from AliExpress!
 *   **Audio Codecs**: 
     *   I2S Breakouts (e.g., INMP441 Mic + MAX98357A DAC)
-    *   I2C Codecs (e.g., ES8388, typically on AudioKit boards)
+    *   I2C Codecs (e.g., ES8388, ES8311 on AudioKit boards)
+*   **Displays**:
+    *   Standard TFT (ST7789, ILI9341)
+    *   Circular LCDs (GC9A01)
 
 ## Web Interface
 
@@ -99,9 +107,9 @@ esp32_sip_client/
 
 *   **SRTP (Secure RTP):** Full encryption of the audio stream using SRTP is required for complete privacy. This is currently deferred until the official ESP-ADF framework integration.
 *   **SIPS (TLS) Completion:** The foundation for SIP over TLS (esp_tls_t) has been conditionally added (USE_SIPS), but requires proper certificate provisioning and server-side testing to fully implement secure SIP signaling.
+*   ~~**Dynamic Codec Negotiation:** Expanding the SDP parser to parse rtpmap dynamically and negotiate codecs like OPUS, rather than defaulting to G.711 µ-law (or G.722).~~ *(Completed in v1.5.0)*
+*   ~~**Hardware Validation:** Testing the I2C OLED (SSD1306), TFT Touchscreen, Captive Portal, and I2S codecs together on a physical prototype or custom PCB.~~ *(Completed via Dynamic GPIO Config in v1.7.0)*
 *   **Full-Duplex AEC (Acoustic Echo Cancellation):** We have implemented half-duplex Echo Suppression (speaker attenuation), which is perfect for the ESP32-C3. For true full-duplex AEC (simultaneous speaking), integration with DSP libraries (like ESP-ADF) is required.
-*   **Dynamic Codec Negotiation:** Expanding the SDP parser to parse rtpmap dynamically and negotiate codecs like OPUS, rather than defaulting to G.711 µ-law (or G.722).
-*   **Hardware Validation:** Testing the I2C OLED (SSD1306), TFT Touchscreen, Captive Portal, and I2S codecs together on a physical prototype or custom PCB.
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
