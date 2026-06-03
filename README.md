@@ -12,11 +12,18 @@ This project provides a robust, production-ready foundation for VoIP intercommun
 * **Graphical User Interface (LVGL)**: Full Touchscreen support (ST7789/ILI9341 via SPI) and touch controllers (e.g., XPT2046) using the industry-standard LVGL library. Includes a visual dialer, active call screen, and incoming call alerts.
 * **PC Simulator**: Develop and test the LVGL User Interface directly on your Windows/Mac/Linux PC using the included SDL2 Simulator, without needing to flash the ESP32!
 * **Hardware & Web Control**:
+  * **Dynamic Hardware Config:** Change I2S, I2C, and SPI GPIO pins directly through the web interface without recompiling the firmware!
   * Captive Portal for Wi-Fi and SIP credentials setup.
   * Matrix Keypads (4x4 GPIO or I2C) for physical dialing.
   * Web-based Phonebook (Speed Dial) saved securely in NVS.
   * DTMF Tone Parsing (via SIP INFO) for remote access (e.g., opening a door).
 * **NAT Traversal (STUN) & Keep-Alive**: Built-in STUN client to discover the public IP/Port behind routers, and periodic UDP Keep-Alive signaling to maintain open router ports.
+
+## Kconfig Hardware Profiles (Tier Architecture)
+To ensure the firmware runs optimally across various Espressif chips without memory exhaustion, we use `Kconfig.projbuild` profiles:
+* **LITE**: For ESP32-C3. G.711 only, internal SRAM jitter buffer, no heavy DSP.
+* **STANDARD**: For standard ESP32 (WROVER). G.722 HD Voice, LVGL GUI, dynamic hardware engine.
+* **PRO / AI**: For ESP32-S3 with PSRAM. Full-Duplex AEC (esp-sr), Ultra-HD OPUS Codec, and Wake Word detection. Includes a massive 100KB+ PSRAM Jitter Buffer (inspired by *Ka-Radio32*) for flawless RTP streaming.
 
 ## Supported Environments & Versions
 
@@ -98,6 +105,8 @@ esp32_sip_client/
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
+* **v1.7.0** - Added **Dynamic Hardware Config Engine**. Change GPIO pins for I2S, SPI, and I2C via the Web Interface and store them in NVS. Flash once, configure anywhere!
+* **v1.6.0** - Introduced **Tier Architecture** via `Kconfig.projbuild` (LITE, STANDARD, PRO) to support C3/S3 chips gracefully. Implemented a massive **PSRAM-backed Jitter Buffer** for WROVER/S3 chips to eliminate RTP network stuttering.
 * **v1.5.0** - Added HD Voice (G.722 Codec) integration. Implemented automatic SDP codec negotiation (fallback from G.722 to PCMA/PCMU) and dynamic I2S sample rate switching (16 kHz / 8 kHz).
 * **v1.4.0.1** - Added LVGL PC Simulator (SDL2). Isolated `simulator/` directory with standalone CMake setup to test and develop the Graphical User Interface on Windows/Mac/Linux without requiring ESP32 hardware or flashing.
 * **v1.4.0** - Added Touchscreen GUI foundation: Integration with LVGL (Light and Versatile Graphics Library) and Touch controllers (e.g., XPT2046). Implemented visual Dialer, Calling, and Incoming screens.

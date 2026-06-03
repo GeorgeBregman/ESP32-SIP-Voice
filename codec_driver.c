@@ -16,6 +16,7 @@ esp_err_t codec_set_mic_gain(uint8_t gain_db);     // Gain in dB (check codec da
 // codec_driver.c
 #include "codec_driver.h"
 #include "app_config.h" // For I2C pins etc.
+#include "config_manager.h"
 #include "esp_log.h"
 
 static const char* TAG = "CODEC";
@@ -29,10 +30,15 @@ static const char* TAG = "CODEC";
 #define CODEC_I2C_ADDRESS 0x18    // Example I2C address for ES8388 (check datasheet/schematic)
 
 static esp_err_t i2c_master_init() {
+     hardware_settings_t hw;
+     config_manager_load_hw(&hw);
+     int sda = hw.pin_i2c_sda != -1 ? hw.pin_i2c_sda : CODEC_I2C_SDA_PIN;
+     int scl = hw.pin_i2c_scl != -1 ? hw.pin_i2c_scl : CODEC_I2C_SCL_PIN;
+
      i2c_config_t conf = {
          .mode = I2C_MODE_MASTER,
-         .sda_io_num = CODEC_I2C_SDA_PIN,
-         .scl_io_num = CODEC_I2C_SCL_PIN,
+         .sda_io_num = sda,
+         .scl_io_num = scl,
          .sda_pullup_en = GPIO_PULLUP_ENABLE,
          .scl_pullup_en = GPIO_PULLUP_ENABLE,
          .master.clk_speed = I2C_MASTER_FREQ_HZ,

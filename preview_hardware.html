@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ESP32 SIP Hardware Config</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .container { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 400px; }
+        h2 { text-align: center; color: #333; margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; color: #666; font-size: 0.9em; }
+        input[type="number"] { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; }
+        input[type="submit"] { width: 100%; padding: 12px; background-color: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 1em; transition: background-color 0.3s; }
+        input[type="submit"]:hover { background-color: #218838; }
+        .section { margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>Hardware GPIO Config</h2>
+    <form action="/hardware" method="post">
+        <div class="section">
+            <h3>I2S Audio</h3>
+            <label>BCLK Pin</label> <input type="number" name="i2s_bck" value="-1" min="-1" max="48">
+            <label>WS Pin</label> <input type="number" name="i2s_ws" value="-1" min="-1" max="48">
+            <label>DOUT Pin</label> <input type="number" name="i2s_dout" value="-1" min="-1" max="48">
+            <label>DIN Pin</label> <input type="number" name="i2s_din" value="-1" min="-1" max="48">
+            <label>MCLK Pin</label> <input type="number" name="i2s_mclk" value="-1" min="-1" max="48">
+        </div>
+        
+        <div class="section">
+            <h3>I2C Control</h3>
+            <label>SDA Pin</label> <input type="number" name="i2c_sda" value="-1" min="-1" max="48">
+            <label>SCL Pin</label> <input type="number" name="i2c_scl" value="-1" min="-1" max="48">
+        </div>
+
+        <div class="section">
+            <h3>SPI & TFT</h3>
+            <label>MOSI Pin</label> <input type="number" name="spi_mosi" value="-1" min="-1" max="48">
+            <label>MISO Pin</label> <input type="number" name="spi_miso" value="-1" min="-1" max="48">
+            <label>CLK Pin</label> <input type="number" name="spi_clk" value="-1" min="-1" max="48">
+            <label>TFT CS Pin</label> <input type="number" name="tft_cs" value="-1" min="-1" max="48">
+            <label>TFT DC Pin</label> <input type="number" name="tft_dc" value="-1" min="-1" max="48">
+            <label>TFT RST Pin</label> <input type="number" name="tft_rst" value="-1" min="-1" max="48">
+        </div>
+
+        <input type="submit" value="Save and Reboot">
+    </form>
+</div>
+</body>
+</html>

@@ -20,6 +20,7 @@ void audio_pipeline_set_sip_handle(audio_pipeline_handle_t handle, sip_client_ha
 // audio_pipeline.c
 #include "audio_pipeline.h"
 #include "app_config.h"
+#include "config_manager.h"
 #include "driver/i2s.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -342,11 +343,19 @@ static esp_err_t i2s_init(void) {
         .fixed_mclk = 0 // Set MCLK frequency if needed by codec, 0 for auto
     };
 
+    hardware_settings_t hw;
+    config_manager_load_hw(&hw);
+
+    int bck = hw.pin_i2s_bck != -1 ? hw.pin_i2s_bck : I2S_BCK_PIN;
+    int ws = hw.pin_i2s_ws != -1 ? hw.pin_i2s_ws : I2S_WS_PIN;
+    int dout = hw.pin_i2s_dout != -1 ? hw.pin_i2s_dout : I2S_DATA_OUT_PIN;
+    int din = hw.pin_i2s_din != -1 ? hw.pin_i2s_din : I2S_DATA_IN_PIN;
+
     i2s_pin_config_t pin_config = {
-        .bck_io_num = I2S_BCK_PIN,
-        .ws_io_num = I2S_WS_PIN,
-        .data_out_num = I2S_DATA_OUT_PIN,
-        .data_in_num = I2S_DATA_IN_PIN
+        .bck_io_num = bck,
+        .ws_io_num = ws,
+        .data_out_num = dout,
+        .data_in_num = din
     };
 
     esp_err_t ret = ESP_OK;
