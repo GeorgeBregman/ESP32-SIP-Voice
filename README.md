@@ -98,6 +98,7 @@ tpmap dynamically and negotiate codecs like G.722 (HD Voice) or OPUS, rather tha
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
+* **v1.3.0** - Transition to full SIP Phone capabilities: Added support for 4x4 matrix keypads (GPIO & I2C options), color TFT displays (ST7789/ILI9341), Web-based Phonebook / Speed Dial saved in NVS, and DTMF (SIP INFO) tone parsing.
 * **v1.2.0** - Added Captive Portal (Web Setup via AP mode), Half-duplex Acoustic Echo Suppression for ESP32-C3, OLED Display support (SSD1306 via I2C), and structural SIPS (TLS) integration.
 * **v1.1.0** - Refactored project architecture: Full SIP State Machine with MD5 auth, STUN implementation, Jitter Buffer / PLC for RTP, Dual Codec support (ES8388 & I2S), and modular UI controller (Buttons/Web/Auto-answer).
 * **v1.0.0** - Initial base template with placeholder functions and basic Wi-Fi connectivity.
