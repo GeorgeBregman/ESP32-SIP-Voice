@@ -571,7 +571,26 @@ static void send_register(sip_client_t *client, bool initial_registration) {
 static int generate_sdp(sip_client_t *client, char *buffer, size_t buffer_len) {
      // Basic SDP offering G.711 u-law on the configured RTP port
      // TODO: Get actual local IP if different from SIP signaling IP
-#ifdef USE_CODEC_G722
+#if defined(USE_CODEC_OPUS)
+     return snprintf(buffer, buffer_len,
+                "v=0\r\n"
+                "o=%s %lu %lu IN IP4 %s\r\n"
+                "s=ESP32 Call\r\n"
+                "c=IN IP4 %s\r\n"
+                "t=0 0\r\n"
+                "m=audio %d RTP/AVP 96 9 8 0\r\n"
+                "a=rtpmap:96 opus/48000/2\r\n"
+                "a=rtpmap:9 G722/8000\r\n"
+                "a=rtpmap:8 PCMA/8000\r\n"
+                "a=rtpmap:0 PCMU/8000\r\n"
+                "a=ptime:%d\r\n"
+                "a=sendrecv\r\n",
+                client->user, esp_random(), esp_random(), client->local_ip_str,
+                client->local_ip_str,
+                client->local_rtp_port,
+                AUDIO_FRAME_MS
+            );
+#elif defined(USE_CODEC_G722)
      return snprintf(buffer, buffer_len,
                 "v=0\r\n"
                 "o=%s %lu %lu IN IP4 %s\r\n"
@@ -840,7 +859,12 @@ static bool parse_sdp(const char *sdp_body, ip_addr_t *remote_ip, uint16_t *remo
          if (sscanf(m_line, "%*[^ ] %u RTP/AVP %u", &port, &payload_type) >= 1) { // Payload type is optional here
              *remote_port = (uint16_t)port;
              ESP_LOGI(TAG, "SDP parsed remote port: %u, Payload Type: %u", *remote_port, payload_type);
-#ifdef USE_CODEC_G722
+#if defined(USE_CODEC_OPUS)
+             if (payload_type != 96 && payload_type != 9 && payload_type != 8 && payload_type != 0) {
+                 ESP_LOGW(TAG, "Unsupported payload type %u received in SDP.", payload_type);
+                 return false;
+             }
+#elif defined(USE_CODEC_G722)
              if (payload_type != 9 && payload_type != 8 && payload_type != 0) {
                  ESP_LOGW(TAG, "Unsupported payload type %u received in SDP.", payload_type);
                  return false;
