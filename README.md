@@ -113,6 +113,7 @@ esp32_sip_client/
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
+* **v1.8.0** - Implemented **Multi-Theme LVGL UI Engine** for circular displays (GC9A01) and traditional screens. Includes 3 dynamically switchable aesthetics via the Web UI: Apple Siri (Glowing Orb), iPhone Call Screen (Glassmorphism), and Amazon Echo (Edge Ring). Fully localized with Cyrillic fonts for Russian names in the Phonebook.
 * **v1.7.0** - Added **Dynamic Hardware Config Engine**. Change GPIO pins for I2S, SPI, and I2C via the Web Interface and store them in NVS. Flash once, configure anywhere!
 * **v1.6.0** - Introduced **Tier Architecture** via `Kconfig.projbuild` (LITE, STANDARD, PRO) to support C3/S3 chips gracefully. Implemented a massive **PSRAM-backed Jitter Buffer** for WROVER/S3 chips to eliminate RTP network stuttering.
 * **v1.5.0** - Added HD Voice (G.722 Codec) integration. Implemented automatic SDP codec negotiation (fallback from G.722 to PCMA/PCMU) and dynamic I2S sample rate switching (16 kHz / 8 kHz).
