@@ -42,5 +42,6 @@ esp_err_t sip_client_register_callbacks(sip_client_handle_t handle, const sip_ca
 sip_call_state_t sip_client_get_call_state(sip_client_handle_t handle);
 esp_err_t sip_client_get_remote_rtp_info(sip_client_handle_t handle, ip_addr_t* remote_ip, uint16_t* remote_port);
 uint16_t sip_client_get_local_rtp_port(sip_client_handle_t handle); // Function needed by audio pipeline
+int sip_client_get_negotiated_pt(sip_client_handle_t handle);       // Negotiated RTP payload type, -1 if none
 
 #endif // SIP_CLIENT_H

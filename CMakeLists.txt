@@ -1,18 +1,8 @@
-# Main component CMakeLists.txt
-idf_component_register(SRCS
-                       "main.c"
-                       "wifi_manager.c"
-                       "sip_client.c"
-                       "rtp_handler.c"
-                       "audio_pipeline.c"
-                       "g711_codec.c"
-                       "codec_driver.c"
-                       "ui_controller.c"
-                       "config_manager.c"
-                       "display.c"
-                       INCLUDE_DIRS "."
-                       REQUIRES lwip mbedtls nvs_flash esp_tls # Add other required components like driver, freertos, esp_wifi, etc.
-                      )
+# Top-level project file for ESP32-SIP-Voice
+# (ESP-IDF requires the project() call to come from the root CMakeLists,
+#  with the application sources living in the `main` component.)
+cmake_minimum_required(VERSION 3.16)
 
-# If using ESP-ADF components for codec drivers, add them here:
-# REQUIRES esxxx_codec esp_codec_dev ...
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+
+project(esp32_sip_voice)

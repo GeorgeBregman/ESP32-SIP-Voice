@@ -1,2 +1,8 @@
+## Managed dependencies for the main component.
+##
+## NOTE: esp-sr (WakeNet) is required by the `audio_pipeline` component
+## (that is where wake_word.c lives), so its dependency declaration was
+## moved to components/audio_pipeline/idf_component.yml.
 dependencies:
-  espressif/esp-sr: "^2.0.0"
+  idf:
+    version: ">=4.4"

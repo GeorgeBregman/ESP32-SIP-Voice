@@ -5,12 +5,57 @@
 #include "phonebook.h"
 #include "esp_log.h"
 #include "esp_system.h"
+#include "esp_http_server.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "mbedtls/base64.h"
+#include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
 
 static const char *TAG = "UI_CTRL";
 static sip_client_handle_t g_sip_client = NULL;
 static app_settings_t *g_settings = NULL;
+
+// Escape a string for safe inclusion inside an HTML attribute / body.
+static void html_escape(char *dst, size_t dst_len, const char *src) {
+    size_t o = 0;
+    for (const char *s = src; *s && o + 7 < dst_len; s++) {
+        switch (*s) {
+            case '&':  o += snprintf(dst + o, dst_len - o, "&amp;");  break;
+            case '<':  o += snprintf(dst + o, dst_len - o, "&lt;");   break;
+            case '>':  o += snprintf(dst + o, dst_len - o, "&gt;");   break;
+            case '"':  o += snprintf(dst + o, dst_len - o, "&quot;"); break;
+            case '\'': o += snprintf(dst + o, dst_len - o, "&#39;");  break;
+            default:   dst[o++] = *s; break;
+        }
+    }
+    dst[o] = '\0';
+}
+
+// Optional HTTP Basic Auth gate (enabled when WEB_UI_PIN is non-empty).
+// Any username is accepted; the password must equal WEB_UI_PIN.
+static bool check_auth(httpd_req_t *req) {
+    if (WEB_UI_PIN[0] == '\0') return true; // gate disabled
+
+    char hdr[128] = {0};
+    if (httpd_req_get_hdr_value_str(req, "Authorization", hdr, sizeof(hdr)) == ESP_OK &&
+        strncmp(hdr, "Basic ", 6) == 0) {
+        unsigned char dec[96];
+        size_t dlen = 0;
+        if (mbedtls_base64_decode(dec, sizeof(dec) - 1, &dlen,
+                                  (const unsigned char *)hdr + 6, strlen(hdr + 6)) == 0) {
+            dec[dlen] = '\0';
+            const char *colon = strchr((char *)dec, ':');
+            const char *pass = colon ? colon + 1 : (char *)dec;
+            if (strcmp(pass, WEB_UI_PIN) == 0) return true;
+        }
+    }
+    httpd_resp_set_status(req, "401 Unauthorized");
+    httpd_resp_set_hdr(req, "WWW-Authenticate", "Basic realm=\"ESP32 SIP\"");
+    httpd_resp_send(req, "Authentication required", HTTPD_RESP_USE_STRLEN);
+    return false;
+}
 
 #ifdef CTRL_METHOD_BUTTONS
 #include "driver/gpio.h"
@@ -79,10 +124,15 @@ static esp_err_t index_get_handler(httpd_req_t *req) {
     if (!resp_str) return ESP_FAIL;
 
     if (wifi_is_ap_mode()) {
-        snprintf(resp_str, 4096, 
+        char e_ssid[80], e_pass[160], e_srv[80], e_user[80], e_spass[160];
+        html_escape(e_ssid,  sizeof(e_ssid),  g_settings->wifi_ssid);
+        html_escape(e_pass,  sizeof(e_pass),  g_settings->wifi_password);
+        html_escape(e_srv,   sizeof(e_srv),   g_settings->sip_server);
+        html_escape(e_user,  sizeof(e_user),  g_settings->sip_user);
+        html_escape(e_spass, sizeof(e_spass), g_settings->sip_password);
+        snprintf(resp_str, 4096,
             "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>ESP32 SIP Setup</title><style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');body{margin:0;padding:0;font-family:'Inter',sans-serif;background:linear-gradient(135deg,#0f2027,#203a43,#2c5364);height:100vh;display:flex;justify-content:center;align-items:center;color:#fff;}.card{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:16px;padding:40px;box-shadow:0 8px 32px 0 rgba(0,0,0,0.37);border:1px solid rgba(255,255,255,0.18);width:100%%;max-width:320px;}h1{text-align:center;margin-top:0;font-size:24px;font-weight:600;letter-spacing:1px;}.form-group{margin-bottom:16px;}label{display:block;font-size:13px;margin-bottom:6px;color:#ccc;}input[type='text'],input[type='password']{width:100%%;padding:10px;border:none;border-radius:8px;background:rgba(255,255,255,0.05);color:#fff;font-size:15px;box-sizing:border-box;transition:all 0.3s;border:1px solid rgba(255,255,255,0.1);}input:focus{outline:none;background:rgba(255,255,255,0.15);border-color:#00d2ff;box-shadow:0 0 10px rgba(0,210,255,0.5);}.btn{width:100%%;padding:14px;background:linear-gradient(90deg,#00d2ff 0%%,#3a7bd5 100%%);border:none;border-radius:8px;color:white;font-size:16px;font-weight:600;cursor:pointer;margin-top:10px;}</style></head><body><div class='card'><h1>ESP32 SIP Setup</h1><form method='POST' action='/setup'><div class='form-group'><label>WiFi SSID</label><input type='text' name='ssid' value='%s'></div><div class='form-group'><label>WiFi Password</label><input type='password' name='pass' value='%s'></div><div class='form-group'><label>SIP Server</label><input type='text' name='sip_server' value='%s'></div><div class='form-group'><label>SIP Username</label><input type='text' name='sip_user' value='%s'></div><div class='form-group'><label>SIP Password</label><input type='password' name='sip_pass' value='%s'></div><button type='submit' class='btn'>Save & Restart</button></form><br><center><a href='/hardware' style='color:#00d2ff;'>Advanced Hardware Config</a></center></div></body></html>",
-            g_settings->wifi_ssid, g_settings->wifi_password, 
-            g_settings->sip_server, g_settings->sip_user, g_settings->sip_password);
+            e_ssid, e_pass, e_srv, e_user, e_spass);
     } else {
         int st = g_sip_client ? sip_client_get_call_state(g_sip_client) : 0;
         snprintf(resp_str, 4096, 
@@ -132,6 +182,7 @@ static esp_err_t setup_post_handler(httpd_req_t *req) {
 }
 
 static esp_err_t action_post_handler(httpd_req_t *req) {
+    if (!check_auth(req)) return ESP_OK;
     if (!g_sip_client) return ESP_FAIL;
     if (strcmp(req->uri, "/call") == 0) {
         sip_client_initiate_call(g_sip_client, SIP_TARGET_URI);
@@ -147,24 +198,31 @@ static esp_err_t action_post_handler(httpd_req_t *req) {
 }
 
 static esp_err_t phonebook_get_handler(httpd_req_t *req) {
+    if (!check_auth(req)) return ESP_OK;
     char *resp_str = calloc(1, 4096);
     if (!resp_str) return ESP_FAIL;
-    
+
     int len = snprintf(resp_str, 4096, "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>Phonebook</title></head><body><h1>Phonebook</h1><ul>");
     phonebook_entry_t entry;
-    for(int i=0; i<MAX_PHONEBOOK_ENTRIES; i++) {
+    for(int i=0; i<MAX_PHONEBOOK_ENTRIES && len < 3600; i++) {
         if(phonebook_load_entry(i, &entry)) {
-            len += snprintf(resp_str + len, 4096 - len, "<li>[%d] %s : %s <form method='POST' action='/pb_del'><input type='hidden' name='id' value='%d'><button type='submit'>Del</button></form></li>", i, entry.name, entry.uri, i);
+            char e_name[MAX_NAME_LEN * 6], e_uri[MAX_URI_LEN * 6];
+            html_escape(e_name, sizeof(e_name), entry.name);
+            html_escape(e_uri,  sizeof(e_uri),  entry.uri);
+            len += snprintf(resp_str + len, 4096 - len, "<li>[%d] %s : %s <form method='POST' action='/pb_del'><input type='hidden' name='id' value='%d'><button type='submit'>Del</button></form></li>", i, e_name, e_uri, i);
         }
     }
-    len += snprintf(resp_str + len, 4096 - len, "</ul><h2>Add Entry</h2><form method='POST' action='/pb_add'><input type='text' name='name' placeholder='Name'><input type='text' name='uri' placeholder='sip:1000@1.2.3.4'><input type='number' name='id' placeholder='Speed Dial 0-9' min='0' max='9'><button type='submit'>Save</button></form><br><a href='/'>Back</a></body></html>");
-    
+    if (len < 4000) {
+        len += snprintf(resp_str + len, 4096 - len, "</ul><h2>Add Entry</h2><form method='POST' action='/pb_add'><input type='text' name='name' placeholder='Name'><input type='text' name='uri' placeholder='sip:1000@1.2.3.4'><input type='number' name='id' placeholder='Speed Dial 0-9' min='0' max='9'><button type='submit'>Save</button></form><br><a href='/'>Back</a></body></html>");
+    }
+
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
     free(resp_str);
     return ESP_OK;
 }
 
 static esp_err_t pb_add_post_handler(httpd_req_t *req) {
+    if (!check_auth(req)) return ESP_OK;
     char buf[256];
     int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
     if (ret > 0) {
@@ -190,6 +248,7 @@ static esp_err_t pb_add_post_handler(httpd_req_t *req) {
 }
 
 static esp_err_t pb_del_post_handler(httpd_req_t *req) {
+    if (!check_auth(req)) return ESP_OK;
     char buf[64];
     int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
     if (ret > 0) {
@@ -204,6 +263,7 @@ static esp_err_t pb_del_post_handler(httpd_req_t *req) {
 }
 
 static esp_err_t hardware_get_handler(httpd_req_t *req) {
+    if (!check_auth(req)) return ESP_OK;
     char *resp_str = calloc(1, 4096);
     if (!resp_str) return ESP_FAIL;
 
@@ -220,6 +280,7 @@ static esp_err_t hardware_get_handler(httpd_req_t *req) {
 }
 
 static esp_err_t hardware_post_handler(httpd_req_t *req) {
+    if (!check_auth(req)) return ESP_OK;
     char buf[512];
     int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
     if (ret <= 0) return ESP_FAIL;
@@ -255,9 +316,12 @@ static esp_err_t hardware_post_handler(httpd_req_t *req) {
 
 static void start_webserver(void) {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    // In captive portal, bind to any. Catch-all for HTTP.
+    // Wildcard matching so the captive-portal catch-all ("/*") works, and a
+    // raised handler limit (default 8 was too low for all our routes).
     config.uri_match_fn = httpd_uri_match_wildcard;
-    
+    config.max_uri_handlers = 16;
+    config.lru_purge_enable = true;
+
     if (httpd_start(&server, &config) == ESP_OK) {
         httpd_uri_t uri_get = { .uri = "/", .method = HTTP_GET, .handler = index_get_handler, .user_ctx = NULL };
         httpd_register_uri_handler(server, &uri_get);
@@ -283,6 +347,12 @@ static void start_webserver(void) {
             httpd_uri_t uri_pb_del = { .uri = "/pb_del", .method = HTTP_POST, .handler = pb_del_post_handler, .user_ctx = NULL };
             httpd_register_uri_handler(server, &uri_pb_del);
         }
+
+        // Captive-portal catch-all: any other GET (e.g. /generate_204,
+        // /hotspot-detect.html) returns the main page so the OS opens it.
+        // Registered LAST so the specific routes above take precedence.
+        httpd_uri_t uri_catch = { .uri = "/*", .method = HTTP_GET, .handler = index_get_handler, .user_ctx = NULL };
+        httpd_register_uri_handler(server, &uri_catch);
     }
 }
 

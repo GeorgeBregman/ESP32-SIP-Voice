@@ -1,0 +1,10 @@
+## Dependencies for the audio_pipeline component.
+##
+## esp-sr provides WakeNet (offline wake word) used by wake_word.c. It is only
+## active when USE_WAKE_WORD=1 in app_config.h. If you build the LITE tier
+## without wake word, you may set USE_WAKE_WORD 0 and drop this dependency.
+##
+## OPUS (PRO tier) is optional: add an IDF opus component here to enable it,
+## e.g.  chmorgan/esp32-libopus: "^1.4.0"  (opus_codec.c auto-detects <opus.h>).
+dependencies:
+  espressif/esp-sr: "^2.0.0"

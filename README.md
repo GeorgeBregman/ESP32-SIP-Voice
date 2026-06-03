@@ -93,21 +93,16 @@ esp32_sip_client/
 ## How to Build and Flash
 
 1. **Prerequisites**: Ensure you have [ESP-IDF v4.4 or later](https://docs.espressif.com/projects/esp-idf/en/latest/esp32/get-started/) installed.
-2. **Configure**: Open `main/app_config.h` and configure:
-   * `WIFI_SSID` & `WIFI_PASSWORD`
-   * `SIP_SERVER_IP`, `SIP_USER`, `SIP_PASSWORD`
-   * I2S and I2C Pinout
-   * Codec Selection (`USE_CODEC_...`)
-   * Control Interface (`CTRL_METHOD_...`)
-3. **Build**:
+2. **Pick a tier** (memory profile) with `idf.py menuconfig` → *ESP32 SIP Voice Configuration* → LITE / STANDARD / PRO. This selects the codec set (G.711 / +G.722 / +OPUS+AEC+WakeNet).
+3. **Configure credentials** — easiest at runtime: flash, connect to the **`ESP-SIP-Setup`** Wi-Fi AP, open `192.168.4.1`, and enter Wi-Fi/SIP details (stored in NVS). Compile-time fallbacks live in `main/app_config.h` (`WIFI_*`, `SIP_*`, pinout, `USE_CODEC_*`, `CTRL_METHOD_*`, optional `WEB_UI_PIN`). GPIO pins are also editable from the web *HW Config* page.
+4. **Build & flash**:
    ```bash
-   idf.py set-target esp32
+   idf.py set-target esp32        # or esp32s3 / esp32c3
    idf.py build
-   ```
-4. **Flash & Monitor**:
-   ```bash
    idf.py -p (YOUR_PORT) flash monitor
    ```
+5. **(Wake word)** Flash a WakeNet model into the `model` partition (defined in `partitions.csv`). With `CONFIG_MODEL_IN_SPIFFS=y` the model is bundled automatically by esp-sr during `flash`. Needs an 8 MB board; on 4 MB boards set `USE_WAKE_WORD 0`.
+6. **(OPUS / PRO)** OPUS is compiled only when libopus is on the include path. Add an IDF opus component to `components/audio_pipeline/idf_component.yml` (e.g. `chmorgan/esp32-libopus`) — `opus_codec.c` auto-detects `<opus.h>`.
 
 ## Next Steps & Important Considerations (TO DO)
 
@@ -115,10 +110,20 @@ esp32_sip_client/
 *   **SIPS (TLS) Completion:** The foundation for SIP over TLS (esp_tls_t) has been conditionally added (USE_SIPS), but requires proper certificate provisioning and server-side testing to fully implement secure SIP signaling.
 *   ~~**Dynamic Codec Negotiation:** Expanding the SDP parser to parse rtpmap dynamically and negotiate codecs like OPUS, rather than defaulting to G.711 µ-law (or G.722).~~ *(Completed in v1.5.0)*
 *   ~~**Hardware Validation:** Testing the I2C OLED (SSD1306), TFT Touchscreen, Captive Portal, and I2S codecs together on a physical prototype or custom PCB.~~ *(Completed via Dynamic GPIO Config in v1.7.0)*
-*   **Full-Duplex AEC (Acoustic Echo Cancellation):** We have implemented half-duplex Echo Suppression (speaker attenuation), which is perfect for the ESP32-C3. For true full-duplex AEC (simultaneous speaking), integration with DSP libraries (like ESP-ADF) is required.
+*   **Full-Duplex AEC (Acoustic Echo Cancellation):** A real NLMS adaptive echo canceller is now implemented in software (`components/audio_pipeline/aec_filter.c`) and runs on plain ESP32/S3. For maximum quality on the PRO tier you can additionally route to esp-sr's hardware-accelerated AEC.
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
+* **v2.1.0** - **Stabilisation & real DSP release.** Fixed the project so it actually builds and runs end-to-end on ESP-IDF:
+  * Corrected ESP-IDF project layout (top-level `project()` CMake + `main/` component with proper `REQUIRES`); extracted the missing `audio_pipeline.h` / `rtp_handler.h` / `g711_codec.h` / `codec_driver.h` headers.
+  * **Real codecs (no more stubs):** full ITU-T **G.711 µ-law _and_ A-law** companding, a complete **ITU-T G.722** sub-band ADPCM implementation, and an **OPUS** wrapper over libopus (auto-detected).
+  * **Real software AEC:** NLMS adaptive echo canceller (replaces the half-duplex attenuation stub).
+  * **Dynamic codec negotiation applied end-to-end:** the SDP-negotiated payload type now drives the encoder/decoder and live I2S sample-rate switching (8/16/48 kHz).
+  * **SIP hardening:** RFC 2617 Digest with `qop=auth` (cnonce/nc), correct response routing to the request source, single-ACK on 200 OK, audio start on _incoming_ calls, INVITE re-auth on 401/407.
+  * **RTP:** non-blocking receive (no more audio-task stalls), corrected 16-bit buffer sizing, fixed PSRAM jitter-buffer allocation.
+  * **WakeNet** ported to the esp-sr **2.x** model-loader API.
+  * **Web UI:** raised HTTP handler limit, optional PIN (HTTP Basic Auth), HTML-escaped fields, captive-portal catch-all, bounds-checked rendering.
+  * Added `partitions.csv` + `sdkconfig.defaults`, fixed the UTF-16 `.gitignore`.
 * **v2.0.0** - Implemented **Edge AI Voice Activation (Wake Word)**! Integrated the `esp-sr` WakeNet framework. The intercom now continuously listens to the microphone locally (offline) and automatically dials a pre-configured SIP number upon hearing the Wake Word (e.g., "Alexa").
 * **v1.9.0** - Refined **Multi-Theme UI Engine**: The *Smart Speaker* theme now automatically detects screen geometry! Circular displays (e.g. GC9A01) render a **Minimalist Clock** aesthetic (clock with outer glowing ring), while rectangular displays (e.g. ST7789) render a **Dashboard** aesthetic (cards with a bottom glowing light bar).
 * **v1.8.0** - Implemented **Multi-Theme LVGL UI Engine** for circular displays (GC9A01) and traditional screens. Includes 3 dynamically switchable aesthetics via the Web UI: Voice Assistant style, Mobile OS style, and Smart Speaker style. Fully localized font mapping supporting multi-language phonebooks (including Cyrillic).

@@ -1,4 +1,5 @@
 #include "wifi_manager.h"
+#include "app_config.h"
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_log.h"
@@ -39,7 +40,8 @@ static void dns_server_task(void *pvParameters) {
         struct sockaddr_in source_addr;
         socklen_t addr_len = sizeof(source_addr);
         int len = recvfrom(sock, rx_buffer, sizeof(rx_buffer), 0, (struct sockaddr *)&source_addr, &addr_len);
-        if (len > 0) {
+        // Need room for the original query + our 16-byte answer record.
+        if (len > 0 && len <= (int)sizeof(tx_buffer) - 16) {
             // Very dumb DNS responder: answers any A record request with our AP IP (192.168.4.1)
             memcpy(tx_buffer, rx_buffer, len);
             tx_buffer[2] |= 0x80; // Set response flag
@@ -112,10 +114,10 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         if (s_is_ap_mode) return;
         
-        if (s_retry_num < 3) {
+        if (s_retry_num < WIFI_MAX_RETRY) {
             esp_wifi_connect();
             s_retry_num++;
-            ESP_LOGI(TAG, "Retry connecting to the AP (%d/3)", s_retry_num);
+            ESP_LOGI(TAG, "Retry connecting to the AP (%d/%d)", s_retry_num, WIFI_MAX_RETRY);
         } else {
             ESP_LOGE(TAG, "Failed to connect to the AP. Falling back to AP Mode (Captive Portal).");
             start_ap_mode();
