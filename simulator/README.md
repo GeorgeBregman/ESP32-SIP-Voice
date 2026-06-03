@@ -71,3 +71,11 @@ cmake --build .
 ```
 
 Use your mouse to click on the screen. The mouse pointer emulates touchscreen input, allowing you to interact with the on-screen Answer/End buttons!
+
+---
+
+## About
+
+This simulator is part of the **[ESP32-SIP-Voice](https://github.com/GeorgeBregman/ESP32-SIP-Voice)** project.
+
+Created by **[George Bregman](https://georgebregman.com/)**.
