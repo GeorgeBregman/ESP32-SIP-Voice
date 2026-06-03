@@ -1,4 +1,4 @@
-# ESP32-SIP-Voice
+# ESP32-SIP-Voice Phone
 
 A fully functional ESP32-based SIP VoIP client built on ESP-IDF and FreeRTOS. 
 
