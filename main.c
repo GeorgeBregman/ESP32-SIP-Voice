@@ -16,6 +16,8 @@
 #include "phonebook.h"
 #include "keypad.h"
 #include "display_tft.h"
+#include "touch_driver.h"
+#include "ui_lvgl.h"
 
 static const char *TAG = "MAIN";
 
@@ -91,6 +93,10 @@ void app_main(void) {
     // Initialize HAL Components
     keypad_init();
     display_tft_init();
+    touch_driver_init();
+    
+    // Initialize Graphic UI
+    ui_lvgl_init();
     
     // Initialize Display
     display_init();

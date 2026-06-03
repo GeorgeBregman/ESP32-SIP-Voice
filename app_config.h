@@ -68,6 +68,11 @@
 #define TFT_DC   GPIO_NUM_2
 #define TFT_RST  GPIO_NUM_4
 
+// 3. Touch Controller (Uncomment to enable Touch UI)
+#define USE_TOUCH_XPT2046
+#define TOUCH_CS   GPIO_NUM_14 // Usually shares SPI with TFT, just needs its own CS
+#define TOUCH_IRQ  GPIO_NUM_27 // Interrupt pin
+
 // --- Task Configuration ---
 #define WIFI_TASK_PRIORITY      5
 #define SIP_TASK_PRIORITY       8               // Higher than WiFi, lower than audio
