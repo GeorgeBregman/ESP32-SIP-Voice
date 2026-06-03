@@ -98,7 +98,8 @@ tpmap dynamically and negotiate codecs like G.722 (HD Voice) or OPUS, rather tha
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
-* **v1.4.0** - Added Touchscreen GUI foundation: Integration with LVGL (Light and Versatile Graphics Library) and Touch controllers (e.g., XPT2046). Implemented visual Dialer, Calling, and Incoming screens. **Note:** UI can be tested on PC using the LVGL SDL2 Simulator before flashing to ESP32.
+* **v1.4.0.1** - Added LVGL PC Simulator (SDL2). Isolated `simulator/` directory with standalone CMake setup to test and develop the Graphical User Interface on Windows/Mac/Linux without requiring ESP32 hardware or flashing.
+* **v1.4.0** - Added Touchscreen GUI foundation: Integration with LVGL (Light and Versatile Graphics Library) and Touch controllers (e.g., XPT2046). Implemented visual Dialer, Calling, and Incoming screens.
 * **v1.3.0** - Transition to full SIP Phone capabilities: Added support for 4x4 matrix keypads (GPIO & I2C options), color TFT displays (ST7789/ILI9341), Web-based Phonebook / Speed Dial saved in NVS, and DTMF (SIP INFO) tone parsing.
 * **v1.2.0** - Added Captive Portal (Web Setup via AP mode), Half-duplex Acoustic Echo Suppression for ESP32-C3, OLED Display support (SSD1306 via I2C), and structural SIPS (TLS) integration.
 * **v1.1.0** - Refactored project architecture: Full SIP State Machine with MD5 auth, STUN implementation, Jitter Buffer / PLC for RTP, Dual Codec support (ES8388 & I2S), and modular UI controller (Buttons/Web/Auto-answer).
