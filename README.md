@@ -114,6 +114,13 @@ esp32_sip_client/
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
+* **v2.2.0** - **Functional LVGL UI.** The three themes are now actually driven, not just static mock-ups:
+  * LVGL is properly pumped (2 ms tick + handler task + thread-safe lock); the panel is initialised for **ST7789 / ILI9341 / GC9A01** (previously only GC9A01 was wired and `panel_handle` didn't even link under the default ST7789 build).
+  * Real **clock with SNTP** time sync; geometry is detected from the actual panel (`display_tft_is_round()`), not a hardcoded 240×240.
+  * Themes react to call state: **Voice Assistant** (clock + glowing orb + Speak/Answer/End), **Mobile OS** (avatar + caller + Decline/Answer), **Smart Speaker** (neon ring + big clock idle face → call info during a call).
+  * **Touch** (XPT2046) is now actually read and bridged to LVGL, so the on-screen Answer/End buttons work (raw bounds are panel-specific — calibrate `TOUCH_*` in `app_config.h`). SIP call events are wired to the UI and the UI buttons back to the SIP client.
+  * Shared `app_config.h`/`config_manager` moved to a `config_store` component so the driver/UI components compile without a circular dependency on `main`.
+  * Note: the photographic blurred backgrounds in the design renders are not reproducible on the panel; the firmware draws solid/gradient backgrounds. Enable the Montserrat fonts (done in `sdkconfig.defaults`) for the large clock.
 * **v2.1.0** - **Stabilisation & real DSP release.** Fixed the project so it actually builds and runs end-to-end on ESP-IDF:
   * Corrected ESP-IDF project layout (top-level `project()` CMake + `main/` component with proper `REQUIRES`); extracted the missing `audio_pipeline.h` / `rtp_handler.h` / `g711_codec.h` / `codec_driver.h` headers.
   * **Real codecs (no more stubs):** full ITU-T **G.711 µ-law _and_ A-law** companding, a complete **ITU-T G.722** sub-band ADPCM implementation, and an **OPUS** wrapper over libopus (auto-detected).

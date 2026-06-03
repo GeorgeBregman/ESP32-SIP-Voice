@@ -6,7 +6,10 @@
 #include "esp_log.h"
 #include "esp_netif.h"
 #include "esp_event.h"
+#include "esp_sntp.h"
 #include "nvs_flash.h"
+#include <time.h>
+#include <stdlib.h>
 
 #include "wifi_manager.h"
 #include "sip_client.h"
@@ -81,6 +84,28 @@ void app_control_task(void *pvParameters) {
 }
 
 
+// ---- UI <-> SIP bridges ----
+// (main owns both sides, so the LVGL UI component never depends on sip_client.)
+static void ui_action_answer(void) { if (g_sip_client) sip_client_answer_call(g_sip_client); }
+static void ui_action_hangup(void) { if (g_sip_client) sip_client_terminate_call(g_sip_client); }
+
+static void on_incoming_call(const char *caller_uri, const char *call_id) {
+    (void)call_id;
+    ui_lvgl_switch_screen(SCREEN_INCOMING, caller_uri);
+}
+static void on_call_answered(const char *call_id) { (void)call_id; ui_lvgl_switch_screen(SCREEN_ACTIVE, NULL); }
+static void on_call_ended(const char *call_id)    { (void)call_id; ui_lvgl_switch_screen(SCREEN_IDLE, NULL); }
+static void on_registration_status(bool registered) { ui_lvgl_set_registered(registered); }
+
+static void init_sntp(void) {
+    sntp_setoperatingmode(SNTP_OPMODE_POLL);
+    sntp_setservername(0, NTP_SERVER);
+    sntp_init();
+    setenv("TZ", TIMEZONE, 1);
+    tzset();
+    ESP_LOGI(TAG, "SNTP started (%s, TZ=%s)", NTP_SERVER, TIMEZONE);
+}
+
 void app_main(void) {
     ESP_LOGI(TAG, "Starting ESP32 SIP Client Application");
 
@@ -154,11 +179,24 @@ void app_main(void) {
     // Initialize UI Controller
     if (g_sip_client) {
         ui_controller_init(g_sip_client, &g_app_settings);
+
+        // Wire the SIP <-> LVGL UI bridges and the on-screen call buttons.
+        sip_callbacks_t cbs = {
+            .on_incoming_call       = on_incoming_call,
+            .on_call_answered       = on_call_answered,
+            .on_call_ended          = on_call_ended,
+            .on_registration_status = on_registration_status,
+        };
+        sip_client_register_callbacks(g_sip_client, &cbs);
+        ui_lvgl_set_action_cb(ui_action_answer, ui_action_hangup);
     }
 
     if (g_audio_pipeline) {
         audio_pipeline_set_wake_word_cb(g_audio_pipeline, ui_controller_wake_word_trigger);
     }
+
+    // Start NTP so the clock themes show real time.
+    init_sntp();
 
     // Create application control task (optional, but good for managing overall state)
     xTaskCreate(app_control_task, "app_ctrl", 4096, NULL, 6, NULL);

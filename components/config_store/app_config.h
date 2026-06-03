@@ -127,6 +127,10 @@
 //#define CTRL_METHOD_AUTO
 #define BUTTON_GPIO            GPIO_NUM_0
 
+// --- Time / NTP (for the on-screen clock themes) ---
+#define NTP_SERVER             "pool.ntp.org"
+#define TIMEZONE               "GMT0"   // POSIX TZ, e.g. "MSK-3", "GMT0", "EST5EDT,M3.2.0,M11.1.0"
+
 // --- Web interface security ---
 // Empty string disables the gate (LAN-only use). Set a PIN to require it on
 // every state-changing endpoint (/call, /answer, /hangup, /setup, /hardware...).
