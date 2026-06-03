@@ -13,6 +13,9 @@
 #include "ui_controller.h" // Include UI Controller
 #include "config_manager.h"
 #include "display.h"
+#include "phonebook.h"
+#include "keypad.h"
+#include "display_tft.h"
 
 static const char *TAG = "MAIN";
 
@@ -81,6 +84,13 @@ void app_main(void) {
     // Initialize NVS Flash & Load Config
     config_manager_init();
     config_manager_load(&g_app_settings);
+    
+    // Initialize Phonebook Storage
+    phonebook_init();
+    
+    // Initialize HAL Components
+    keypad_init();
+    display_tft_init();
     
     // Initialize Display
     display_init();

@@ -40,6 +40,34 @@
 #define CODEC_I2C_SCL_PIN       GPIO_NUM_18      // Example Pin
 #define CODEC_I2C_SDA_PIN       GPIO_NUM_19      // Example Pin
 
+// --- Phone Hardware Configuration (v1.3.0) ---
+// 1. Keypad Selection (Uncomment ONE)
+#define USE_KEYPAD_4X4_GPIO
+//#define USE_KEYPAD_I2C_PCF8574
+#define KEYPAD_R1 GPIO_NUM_32
+#define KEYPAD_R2 GPIO_NUM_33
+#define KEYPAD_R3 GPIO_NUM_27
+#define KEYPAD_R4 GPIO_NUM_14
+#define KEYPAD_C1 GPIO_NUM_12
+#define KEYPAD_C2 GPIO_NUM_13
+#define KEYPAD_C3 GPIO_NUM_4
+#define KEYPAD_C4 GPIO_NUM_5
+
+// I2C Keypad Pins (if USE_KEYPAD_I2C_PCF8574 is used)
+#define KEYPAD_I2C_ADDR 0x20
+#define KEYPAD_I2C_SDA  GPIO_NUM_21
+#define KEYPAD_I2C_SCL  GPIO_NUM_22
+
+// 2. Display Selection (Uncomment ONE)
+#define USE_DISPLAY_ST7789 // 1.3" / 1.54" IPS
+//#define USE_DISPLAY_ILI9341 // 2.4" / 2.8" TFT
+// TFT Pins (SPI)
+#define TFT_MOSI GPIO_NUM_23
+#define TFT_SCLK GPIO_NUM_18
+#define TFT_CS   GPIO_NUM_15
+#define TFT_DC   GPIO_NUM_2
+#define TFT_RST  GPIO_NUM_4
+
 // --- Task Configuration ---
 #define WIFI_TASK_PRIORITY      5
 #define SIP_TASK_PRIORITY       8               // Higher than WiFi, lower than audio

@@ -1122,8 +1122,25 @@ static void process_incoming_sip(sip_client_t *client, char *buffer, int len, st
                   ESP_LOGW(TAG, "Received CANCEL but no matching pending INVITE. Sending 481.");
                   send_sip_response(client, 481, "Call/Transaction Does Not Exist", NULL);
              }
+        } else if (strcmp(method, "INFO") == 0) {
+             ESP_LOGI(TAG, "Received INFO request.");
+             parse_header(buffer, "Content-Type", content_type_hdr, sizeof(content_type_hdr));
+             if (strstr(content_type_hdr, "application/dtmf-relay")) {
+                 char *body = strstr(buffer, "\r\n\r\n");
+                 if (body) {
+                     body += 4;
+                     char signal[16] = {0};
+                     if (parse_header(body, "Signal", signal, sizeof(signal))) {
+                         ESP_LOGI(TAG, "DTMF Signal Received: %s", signal);
+                         // TODO: trigger application callback or GPIO relay here
+                         if (signal[0] == '1') {
+                             ESP_LOGI(TAG, "DTMF trigger '1' matched! Action executed.");
+                         }
+                     }
+                 }
+             }
+             send_sip_response(client, 200, "OK", NULL);
         } else if (strcmp(method, "OPTIONS") == 0) {
-             ESP_LOGI(TAG, "Received OPTIONS request. Sending 200 OK.");
              // Send 200 OK response, listing allowed methods in Allow header
              send_sip_response(client, 200, "OK", NULL); // Need context
         } else {

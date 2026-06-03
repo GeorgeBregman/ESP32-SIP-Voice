@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ESP32 SIP Phone</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+body {
+    margin: 0; font-family: 'Inter', sans-serif;
+    background: linear-gradient(135deg, #141e30, #243b55);
+    height: 100vh; display: flex; justify-content: center; align-items: center; color: #fff;
+}
+.card {
+    background: rgba(255,255,255,0.05); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
+    border-radius: 20px; padding: 40px; text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1);
+    width: 100%; max-width: 320px;
+    animation: fadeIn 0.8s ease-out;
+}
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+h1 { margin-top: 0; font-size: 26px; }
+.status {
+    font-size: 18px; margin-bottom: 30px; color: #00d2ff; font-weight: 600;
+}
+.btn {
+    width: 100%; padding: 15px; margin-bottom: 15px; border: none; border-radius: 10px;
+    color: white; font-size: 16px; font-weight: 600; cursor: pointer;
+    transition: transform 0.2s, filter 0.2s, box-shadow 0.2s;
+}
+.btn:hover { transform: translateY(-2px); filter: brightness(1.1); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+.btn:active { transform: translateY(0); }
+.btn-call { background: linear-gradient(90deg, #11998e, #38ef7d); }
+.btn-answer { background: linear-gradient(90deg, #2193b0, #6dd5ed); }
+.btn-hangup { background: linear-gradient(90deg, #cb2d3e, #ef473a); }
+</style>
+</head>
+<body>
+<div class="card">
+    <h1>ESP32 Intercom</h1>
+    <div class="status">Status: Ringing...</div>
+    <form method="POST" action="/call"><button type="submit" class="btn btn-call">Call Doorbell</button></form>
+    <form method="POST" action="/answer"><button type="submit" class="btn btn-answer">Answer Call</button></form>
+    <form method="POST" action="/hangup"><button type="submit" class="btn btn-hangup">Hangup</button></form>
+</div>
+</body>
+</html>

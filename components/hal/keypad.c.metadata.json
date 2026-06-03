@@ -1,0 +1,5 @@
+{
+  "artifactType":  "ARTIFACT_TYPE_OTHER",
+  "summary":  "Keypad driver implementation using GPIO matrix scanner",
+  "updatedAt":  "2026-06-03T11:04:13.720312600Z"
+}

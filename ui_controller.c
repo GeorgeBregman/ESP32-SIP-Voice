@@ -2,6 +2,7 @@
 #include "app_config.h"
 #include "config_manager.h"
 #include "wifi_manager.h"
+#include "phonebook.h"
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
@@ -85,7 +86,7 @@ static esp_err_t index_get_handler(httpd_req_t *req) {
     } else {
         int st = g_sip_client ? sip_client_get_call_state(g_sip_client) : 0;
         snprintf(resp_str, 4096, 
-            "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>ESP32 SIP Phone</title><style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');body{margin:0;font-family:'Inter',sans-serif;background:linear-gradient(135deg,#141e30,#243b55);height:100vh;display:flex;justify-content:center;align-items:center;color:#fff;}.card{background:rgba(255,255,255,0.05);backdrop-filter:blur(15px);border-radius:20px;padding:40px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);width:100%%;max-width:320px;}h1{margin-top:0;font-size:26px;}.status{font-size:18px;margin-bottom:30px;color:#00d2ff;font-weight:600;}.btn{width:100%%;padding:15px;margin-bottom:15px;border:none;border-radius:10px;color:white;font-size:16px;font-weight:600;cursor:pointer;}.btn-call{background:linear-gradient(90deg,#11998e,#38ef7d);}.btn-answer{background:linear-gradient(90deg,#2193b0,#6dd5ed);}.btn-hangup{background:linear-gradient(90deg,#cb2d3e,#ef473a);}</style></head><body><div class='card'><h1>ESP32 Intercom</h1><div class='status'>State: %d</div><form method='POST' action='/call'><button type='submit' class='btn btn-call'>Call</button></form><form method='POST' action='/answer'><button type='submit' class='btn btn-answer'>Answer</button></form><form method='POST' action='/hangup'><button type='submit' class='btn btn-hangup'>Hangup</button></form></div></body></html>", st);
+            "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>ESP32 SIP Phone</title><style>@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');body{margin:0;font-family:'Inter',sans-serif;background:linear-gradient(135deg,#141e30,#243b55);height:100vh;display:flex;justify-content:center;align-items:center;color:#fff;}.card{background:rgba(255,255,255,0.05);backdrop-filter:blur(15px);border-radius:20px;padding:40px;text-align:center;box-shadow:0 10px 30px rgba(0,0,0,0.5);border:1px solid rgba(255,255,255,0.1);width:100%%;max-width:320px;}h1{margin-top:0;font-size:26px;}.status{font-size:18px;margin-bottom:30px;color:#00d2ff;font-weight:600;}.btn{width:100%%;padding:15px;margin-bottom:15px;border:none;border-radius:10px;color:white;font-size:16px;font-weight:600;cursor:pointer;}.btn-call{background:linear-gradient(90deg,#11998e,#38ef7d);}.btn-answer{background:linear-gradient(90deg,#2193b0,#6dd5ed);}.btn-hangup{background:linear-gradient(90deg,#cb2d3e,#ef473a);}</style></head><body><div class='card'><h1>ESP32 Intercom</h1><div class='status'>State: %d</div><form method='POST' action='/call'><button type='submit' class='btn btn-call'>Call</button></form><form method='POST' action='/answer'><button type='submit' class='btn btn-answer'>Answer</button></form><form method='POST' action='/hangup'><button type='submit' class='btn btn-hangup'>Hangup</button></form><br><a href='/phonebook' style='color:#fff;'>Phonebook</a></div></body></html>", st);
     }
     httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
     free(resp_str);
@@ -145,6 +146,63 @@ static esp_err_t action_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+static esp_err_t phonebook_get_handler(httpd_req_t *req) {
+    char *resp_str = calloc(1, 4096);
+    if (!resp_str) return ESP_FAIL;
+    
+    int len = snprintf(resp_str, 4096, "<!DOCTYPE html><html lang='en'><head><meta charset='UTF-8'><meta name='viewport' content='width=device-width, initial-scale=1.0'><title>Phonebook</title></head><body><h1>Phonebook</h1><ul>");
+    phonebook_entry_t entry;
+    for(int i=0; i<MAX_PHONEBOOK_ENTRIES; i++) {
+        if(phonebook_load_entry(i, &entry)) {
+            len += snprintf(resp_str + len, 4096 - len, "<li>[%d] %s : %s <form method='POST' action='/pb_del'><input type='hidden' name='id' value='%d'><button type='submit'>Del</button></form></li>", i, entry.name, entry.uri, i);
+        }
+    }
+    len += snprintf(resp_str + len, 4096 - len, "</ul><h2>Add Entry</h2><form method='POST' action='/pb_add'><input type='text' name='name' placeholder='Name'><input type='text' name='uri' placeholder='sip:1000@1.2.3.4'><input type='number' name='id' placeholder='Speed Dial 0-9' min='0' max='9'><button type='submit'>Save</button></form><br><a href='/'>Back</a></body></html>");
+    
+    httpd_resp_send(req, resp_str, HTTPD_RESP_USE_STRLEN);
+    free(resp_str);
+    return ESP_OK;
+}
+
+static esp_err_t pb_add_post_handler(httpd_req_t *req) {
+    char buf[256];
+    int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    if (ret > 0) {
+        buf[ret] = '\0';
+        char name[32]={0}, uri[64]={0}, id_str[4]={0};
+        char *p = strtok(buf, "&");
+        while(p) {
+            char *v = strchr(p, '=');
+            if(v) { *v++ = '\0';
+                if(strcmp(p, "name")==0) url_decode(name, v);
+                else if(strcmp(p, "uri")==0) url_decode(uri, v);
+                else if(strcmp(p, "id")==0) url_decode(id_str, v);
+            }
+            p = strtok(NULL, "&");
+        }
+        int id = atoi(id_str);
+        phonebook_save_entry(id, name, uri);
+    }
+    httpd_resp_set_status(req, "303 See Other");
+    httpd_resp_set_hdr(req, "Location", "/phonebook");
+    httpd_resp_send(req, NULL, 0);
+    return ESP_OK;
+}
+
+static esp_err_t pb_del_post_handler(httpd_req_t *req) {
+    char buf[64];
+    int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    if (ret > 0) {
+        buf[ret] = '\0';
+        char *v = strchr(buf, '=');
+        if(v) phonebook_clear_entry(atoi(v+1));
+    }
+    httpd_resp_set_status(req, "303 See Other");
+    httpd_resp_set_hdr(req, "Location", "/phonebook");
+    httpd_resp_send(req, NULL, 0);
+    return ESP_OK;
+}
+
 static void start_webserver(void) {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     // In captive portal, bind to any. Catch-all for HTTP.
@@ -163,6 +221,13 @@ static void start_webserver(void) {
             httpd_register_uri_handler(server, &uri_answer);
             httpd_uri_t uri_hangup = { .uri = "/hangup", .method = HTTP_POST, .handler = action_post_handler, .user_ctx = NULL };
             httpd_register_uri_handler(server, &uri_hangup);
+            
+            httpd_uri_t uri_pb = { .uri = "/phonebook", .method = HTTP_GET, .handler = phonebook_get_handler, .user_ctx = NULL };
+            httpd_register_uri_handler(server, &uri_pb);
+            httpd_uri_t uri_pb_add = { .uri = "/pb_add", .method = HTTP_POST, .handler = pb_add_post_handler, .user_ctx = NULL };
+            httpd_register_uri_handler(server, &uri_pb_add);
+            httpd_uri_t uri_pb_del = { .uri = "/pb_del", .method = HTTP_POST, .handler = pb_del_post_handler, .user_ctx = NULL };
+            httpd_register_uri_handler(server, &uri_pb_del);
         }
     }
 }
