@@ -54,8 +54,13 @@ The project includes a built-in lightweight HTTP server for configuration and ca
 When Wi-Fi or SIP credentials are missing, the ESP32 hosts an AP (ESP-SIP-Setup). Connect to it and navigate to 192.168.4.1 to enter your credentials.
 ![Captive Portal Setup](assets/esp32-sip-phone-setup.jpg)
 
-### Call Control Interface
-Once connected to Wi-Fi and registered with your SIP Server, you can control calls via the web interface by visiting the ESP32's assigned IP address.
+### Call Control Interface & UI Themes
+Once connected to Wi-Fi and registered with your SIP Server, you can control calls via the web interface by visiting the ESP32's assigned IP address. The web interface also allows you to dynamically switch the LVGL GUI Theme on the device!
+
+| Siri-inspired | iOS-style Call Screen | Echo-inspired |
+|:---:|:---:|:---:|
+| <img src="assets/theme_siri.png" width="200"/> | <img src="assets/theme_iphone.png" width="200"/> | <img src="assets/theme_echo.png" width="200"/> |
+
 ![Call UI](assets/esp32-ringing.jpg)
 
 
@@ -113,7 +118,7 @@ esp32_sip_client/
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
-* **v1.8.0** - Implemented **Multi-Theme LVGL UI Engine** for circular displays (GC9A01) and traditional screens. Includes 3 dynamically switchable aesthetics via the Web UI: Apple Siri (Glowing Orb), iPhone Call Screen (Glassmorphism), and Amazon Echo (Edge Ring). Fully localized with Cyrillic fonts for Russian names in the Phonebook.
+* **v1.8.0** - Implemented **Multi-Theme LVGL UI Engine** for circular displays (GC9A01) and traditional screens. Includes 3 dynamically switchable aesthetics via the Web UI: Apple Siri-inspired (Glowing Orb), iOS-style Call Screen (Glassmorphism), and Amazon Echo-inspired (Edge Ring). Fully localized font mapping supporting multi-language phonebooks (including Cyrillic).
 * **v1.7.0** - Added **Dynamic Hardware Config Engine**. Change GPIO pins for I2S, SPI, and I2C via the Web Interface and store them in NVS. Flash once, configure anywhere!
 * **v1.6.0** - Introduced **Tier Architecture** via `Kconfig.projbuild` (LITE, STANDARD, PRO) to support C3/S3 chips gracefully. Implemented a massive **PSRAM-backed Jitter Buffer** for WROVER/S3 chips to eliminate RTP network stuttering.
 * **v1.5.0** - Added HD Voice (G.722 Codec) integration. Implemented automatic SDP codec negotiation (fallback from G.722 to PCMA/PCMU) and dynamic I2S sample rate switching (16 kHz / 8 kHz).
