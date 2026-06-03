@@ -73,12 +73,15 @@
 #define TOUCH_CS   GPIO_NUM_14 // Usually shares SPI with TFT, just needs its own CS
 #define TOUCH_IRQ  GPIO_NUM_27 // Interrupt pin
 
-// --- Audio & Codec Configuration ---
-#define USE_CODEC_G722 // Uncomment to enable HD Voice (16kHz). If commented, uses G.711 (8kHz)
-// #define USE_CODEC_OPUS // Uncomment to enable Ultra-HD Voice (48kHz) via OPUS. Overrides G722.
-
-// Acoustic Echo Cancellation (AEC)
-// #define USE_FULL_DUPLEX_AEC // Requires ESP32-S3 and esp-sr/esp-adf library
+// --- Audio & Codec Configuration (Auto-configured by Kconfig) ---
+#if defined(CONFIG_SIP_PROFILE_PRO)
+    #define USE_CODEC_OPUS
+    #define USE_FULL_DUPLEX_AEC
+#elif defined(CONFIG_SIP_PROFILE_STANDARD)
+    #define USE_CODEC_G722
+#else
+    // LITE Profile defaults to G.711 (8kHz)
+#endif
 
 #if defined(USE_CODEC_OPUS)
 #define AUDIO_SAMPLE_RATE       48000

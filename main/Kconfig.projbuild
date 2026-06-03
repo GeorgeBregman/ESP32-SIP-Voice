@@ -1,0 +1,29 @@
+menu "ESP32 SIP Voice Configuration"
+
+    choice SIP_HARDWARE_PROFILE
+        prompt "Hardware Capability Profile"
+        default SIP_PROFILE_STANDARD
+        help
+            Select the hardware tier. This enables/disables heavy features like OPUS and AEC
+            based on your hardware capabilities to save memory and flash.
+
+        config SIP_PROFILE_LITE
+            bool "LITE (ESP32-C3 / Old ESP32 without PSRAM)"
+            help
+                Basic SIP client. Uses G.711/G.722 only. Small SRAM-based Jitter Buffer.
+                No OPUS, no AEC, minimal UI. Best for resource-constrained chips.
+
+        config SIP_PROFILE_STANDARD
+            bool "STANDARD (ESP32 with PSRAM)"
+            help
+                Full GUI with LVGL, large PSRAM-based Jitter Buffer, G.722 HD Voice.
+                Software Echo Suppression. Recommended for typical ESP32 WROVER boards.
+
+        config SIP_PROFILE_PRO
+            bool "PRO / AI (ESP32-S3 with PSRAM)"
+            help
+                Enables Ultra-HD OPUS Codec, Full-Duplex AEC (esp-sr), and Wake Word detection.
+                Requires ESP32-S3 vector instructions and external PSRAM.
+    endchoice
+
+endmenu

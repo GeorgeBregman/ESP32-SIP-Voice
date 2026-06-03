@@ -62,7 +62,8 @@ typedef struct rtp_session_s {
     uint16_t sequence_number;
     uint32_t timestamp_offset; // Initial timestamp based on sample rate
     // --- Jitter Buffer Fields ---
-    rtp_packet_entry_t jitter_buffer[JITTER_BUFFER_SIZE];
+    rtp_packet_entry_t *jitter_buffer;
+    size_t jitter_buffer_size;
     SemaphoreHandle_t jitter_mutex;
     uint16_t next_playout_seq;
     bool is_buffering;
@@ -102,6 +103,28 @@ rtp_session_handle_t rtp_session_create(uint16_t local_port) {
     }
 
     ESP_LOGI(TAG, "RTP session created. SSRC: 0x%08lX, Listening on port %d", session->ssrc, session->local_port);
+    
+    // Allocate Jitter Buffer dynamically (Try PSRAM first for larger buffer, otherwise SRAM)
+#ifdef CONFIG_SPIRAM_SUPPORT
+    // If PSRAM is available, we can afford a much larger buffer (e.g., 50 packets)
+    session->jitter_buffer_size = 50;
+    session->jitter_buffer = (rtp_packet_entry_t *)heap_caps_calloc(session->jitter_buffer_size, sizeof(rtp_packet_entry_t), MALLOC_CAP_SPIRAM);
+#else
+    session->jitter_buffer = NULL;
+#endif
+
+    if (!session->jitter_buffer) {
+        // Fallback to internal SRAM with a smaller buffer size (e.g., JITTER_BUFFER_SIZE)
+        session->jitter_buffer_size = JITTER_BUFFER_SIZE;
+        session->jitter_buffer = (rtp_packet_entry_t *)calloc(session->jitter_buffer_size, sizeof(rtp_packet_entry_t));
+        if (!session->jitter_buffer) {
+            ESP_LOGE(TAG, "Failed to allocate memory for Jitter Buffer");
+            close(session->rtp_socket);
+            free(session);
+            return NULL;
+        }
+    }
+
     session->jitter_mutex = xSemaphoreCreateMutex();
     session->is_buffering = true;
     session->valid_packets_count = 0;
@@ -117,6 +140,9 @@ void rtp_session_delete(rtp_session_handle_t handle) {
     }
     if (session->jitter_mutex) {
         vSemaphoreDelete(session->jitter_mutex);
+    }
+    if (session->jitter_buffer) {
+        free(session->jitter_buffer);
     }
     free(session);
     ESP_LOGI(TAG, "RTP session deleted.");
@@ -250,8 +276,8 @@ void rtp_jitter_buffer_put(rtp_session_handle_t handle, const rtp_header_t* head
         session->next_playout_seq = header->seq;
     }
 
-    // Determine index by seq % JITTER_BUFFER_SIZE
-    int idx = header->seq % JITTER_BUFFER_SIZE;
+    // Determine index by seq % jitter_buffer_size
+    int idx = header->seq % session->jitter_buffer_size;
 
     // Only store if the slot is empty or holds an old packet we can overwrite
     if (!session->jitter_buffer[idx].is_valid || session->jitter_buffer[idx].seq != header->seq) {
@@ -265,7 +291,7 @@ void rtp_jitter_buffer_put(rtp_session_handle_t handle, const rtp_header_t* head
     }
 
     // Stop buffering when we have enough packets
-    if (session->is_buffering && session->valid_packets_count >= JITTER_BUFFER_SIZE / 2) {
+    if (session->is_buffering && session->valid_packets_count >= session->jitter_buffer_size / 2) {
         session->is_buffering = false; 
     }
 
@@ -285,7 +311,7 @@ int rtp_jitter_buffer_get(rtp_session_handle_t handle, rtp_header_t* header, uin
         return AUDIO_SAMPLES_PER_FRAME;
     }
 
-    int idx = session->next_playout_seq % JITTER_BUFFER_SIZE;
+    int idx = session->next_playout_seq % session->jitter_buffer_size;
     int return_len = 0;
 
     if (session->jitter_buffer[idx].is_valid && session->jitter_buffer[idx].seq == session->next_playout_seq) {
