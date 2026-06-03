@@ -118,6 +118,7 @@ esp32_sip_client/
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
+* **v1.9.0** - Refined **Multi-Theme UI Engine**: The *Amazon Echo* theme now automatically detects screen geometry! Circular displays (e.g. GC9A01) render the **Echo Spot** aesthetic (clock with outer glowing ring), while rectangular displays (e.g. ST7789) render the **Echo Show 8** aesthetic (dashboard cards with a bottom glowing light bar).
 * **v1.8.0** - Implemented **Multi-Theme LVGL UI Engine** for circular displays (GC9A01) and traditional screens. Includes 3 dynamically switchable aesthetics via the Web UI: Apple Siri-inspired (Glowing Orb), iOS-style Call Screen (Glassmorphism), and Amazon Echo-inspired (Edge Ring). Fully localized font mapping supporting multi-language phonebooks (including Cyrillic).
 * **v1.7.0** - Added **Dynamic Hardware Config Engine**. Change GPIO pins for I2S, SPI, and I2C via the Web Interface and store them in NVS. Flash once, configure anywhere!
 * **v1.6.0** - Introduced **Tier Architecture** via `Kconfig.projbuild` (LITE, STANDARD, PRO) to support C3/S3 chips gracefully. Implemented a massive **PSRAM-backed Jitter Buffer** for WROVER/S3 chips to eliminate RTP network stuttering.

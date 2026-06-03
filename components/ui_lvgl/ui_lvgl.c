@@ -26,7 +26,8 @@ static lv_obj_t * iphone_avatar;
 static lv_obj_t * iphone_bg;
 
 // Echo objects
-static lv_obj_t * echo_ring;
+static lv_obj_t * echo_ring; // For circular screens (Spot)
+static lv_obj_t * echo_bar;  // For rectangular screens (Show)
 
 static lv_obj_t * status_label;
 
@@ -74,19 +75,54 @@ static void init_theme_iphone() {
 static void init_theme_echo() {
     lv_obj_set_style_bg_color(lv_scr_act(), lv_color_hex(0x000000), 0);
     
-    // Echo edge ring (cyan/blue)
-    echo_ring = lv_arc_create(lv_scr_act());
-    lv_obj_set_size(echo_ring, 240, 240);
-    lv_obj_center(echo_ring);
-    lv_arc_set_rotation(echo_ring, 270);
-    lv_arc_set_bg_angles(echo_ring, 0, 360);
-    lv_obj_remove_style(echo_ring, NULL, LV_PART_KNOB);
-    lv_obj_clear_flag(echo_ring, LV_OBJ_FLAG_CLICKABLE);
+    // Auto-detect Geometry
+    lv_disp_t * disp = lv_disp_get_default();
+    lv_coord_t w = lv_disp_get_hor_res(disp);
+    lv_coord_t h = lv_disp_get_ver_res(disp);
     
-    lv_obj_set_style_arc_color(echo_ring, lv_color_hex(0x00ffff), LV_PART_INDICATOR);
-    lv_obj_set_style_arc_width(echo_ring, 12, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_color(echo_ring, lv_color_hex(0x000000), LV_PART_MAIN);
-    lv_obj_set_style_arc_width(echo_ring, 0, LV_PART_MAIN);
+    if (w == h) {
+        // Echo Spot (Circular)
+        echo_ring = lv_arc_create(lv_scr_act());
+        lv_obj_set_size(echo_ring, w, h);
+        lv_obj_center(echo_ring);
+        lv_arc_set_rotation(echo_ring, 270);
+        lv_arc_set_bg_angles(echo_ring, 0, 360);
+        lv_obj_remove_style(echo_ring, NULL, LV_PART_KNOB);
+        lv_obj_clear_flag(echo_ring, LV_OBJ_FLAG_CLICKABLE);
+        
+        lv_obj_set_style_arc_color(echo_ring, lv_color_hex(0x00ffff), LV_PART_INDICATOR);
+        lv_obj_set_style_arc_width(echo_ring, 12, LV_PART_INDICATOR);
+        lv_obj_set_style_arc_color(echo_ring, lv_color_hex(0x000000), LV_PART_MAIN);
+        lv_obj_set_style_arc_width(echo_ring, 0, LV_PART_MAIN);
+    } else {
+        // Echo Show (Rectangular Dashboard)
+        // Background gradient
+        lv_obj_t * bg = lv_obj_create(lv_scr_act());
+        lv_obj_set_size(bg, w, h);
+        lv_obj_set_style_bg_grad_color(bg, lv_color_hex(0x1a2a6c), 0);
+        lv_obj_set_style_bg_color(bg, lv_color_hex(0x112233), 0);
+        lv_obj_set_style_bg_grad_dir(bg, LV_GRAD_DIR_VER, 0);
+        lv_obj_set_style_border_width(bg, 0, 0);
+        
+        // Widget Card placeholder
+        lv_obj_t * widget = lv_obj_create(bg);
+        lv_obj_set_size(widget, w / 2 - 20, h - 40);
+        lv_obj_align(widget, LV_ALIGN_LEFT_MID, 10, 0);
+        lv_obj_set_style_radius(widget, 10, 0);
+        lv_obj_set_style_bg_color(widget, lv_color_hex(0xffffff), 0);
+        lv_obj_set_style_bg_opa(widget, LV_OPA_20, 0);
+        lv_obj_set_style_border_width(widget, 0, 0);
+        
+        // Light bar at the bottom
+        echo_bar = lv_obj_create(lv_scr_act());
+        lv_obj_set_size(echo_bar, w, 6);
+        lv_obj_align(echo_bar, LV_ALIGN_BOTTOM_MID, 0, 0);
+        lv_obj_set_style_bg_color(echo_bar, lv_color_hex(0x00ffff), 0);
+        lv_obj_set_style_border_width(echo_bar, 0, 0);
+        lv_obj_set_style_shadow_color(echo_bar, lv_color_hex(0x00ffff), 0);
+        lv_obj_set_style_shadow_width(echo_bar, 20, 0);
+        lv_obj_set_style_shadow_spread(echo_bar, 5, 0);
+    }
 }
 
 void ui_lvgl_init(void) {
@@ -162,8 +198,13 @@ void ui_lvgl_switch_screen(ui_screen_t screen, const char *caller_id) {
     } else if (current_theme == 1 && iphone_bg) {
         // Change iPhone gradient based on status
         lv_obj_set_style_bg_grad_color(iphone_bg, theme_color, 0);
-    } else if (current_theme == 2 && echo_ring) {
-        lv_obj_set_style_arc_color(echo_ring, theme_color, LV_PART_INDICATOR);
+    } else if (current_theme == 2) {
+        if (echo_ring) {
+            lv_obj_set_style_arc_color(echo_ring, theme_color, LV_PART_INDICATOR);
+        } else if (echo_bar) {
+            lv_obj_set_style_bg_color(echo_bar, theme_color, 0);
+            lv_obj_set_style_shadow_color(echo_bar, theme_color, 0);
+        }
     }
 }
 
@@ -173,10 +214,15 @@ void ui_lvgl_update_energy(uint8_t energy_level) {
         lv_coord_t spread = 5 + (energy_level / 8);
         lv_obj_set_style_shadow_width(siri_orb, width, 0);
         lv_obj_set_style_shadow_spread(siri_orb, spread, 0);
-    } else if (current_theme == 2 && echo_ring) {
-        // Echo ring fills up based on energy or just changes thickness
-        lv_obj_set_style_arc_width(echo_ring, 12 + (energy_level / 16), LV_PART_INDICATOR);
-        lv_arc_set_value(echo_ring, (energy_level * 100) / 255);
+    } else if (current_theme == 2) {
+        if (echo_ring) {
+            lv_obj_set_style_arc_width(echo_ring, 12 + (energy_level / 16), LV_PART_INDICATOR);
+            lv_arc_set_value(echo_ring, (energy_level * 100) / 255);
+        } else if (echo_bar) {
+            // Echo bar breathes vertically and glows
+            lv_obj_set_style_shadow_width(echo_bar, 10 + (energy_level / 4), 0);
+            lv_obj_set_style_shadow_spread(echo_bar, 2 + (energy_level / 10), 0);
+        }
     }
 }
 
