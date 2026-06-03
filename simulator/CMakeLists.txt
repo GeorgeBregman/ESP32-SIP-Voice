@@ -37,6 +37,14 @@ set(SOURCES
 
 add_executable(simulator ${SOURCES})
 
+# Pass command line options to compiler
+if(SIM_THEME)
+    target_compile_definitions(simulator PRIVATE SIM_THEME=${SIM_THEME})
+endif()
+if(SIM_ROUND)
+    target_compile_definitions(simulator PRIVATE SIM_ROUND=${SIM_ROUND})
+endif()
+
 # Link libraries
 target_link_libraries(simulator PRIVATE lvgl lvgl::examples lvgl::demos lv_drivers ${SDL2_LIBRARIES})
 target_include_directories(simulator PRIVATE ${SDL2_INCLUDE_DIRS})
