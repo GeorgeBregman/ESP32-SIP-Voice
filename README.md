@@ -114,6 +114,10 @@ esp32_sip_client/
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
+* **v2.2.0.1** - **Cross-Platform LVGL Simulator & Compliance Update**. 
+  * Made `ui_lvgl.c` truly cross-platform by guarding ESP-IDF specific includes and functions under `#ifdef ESP_PLATFORM`. This allows the exact same UI codebase to compile natively on a PC using the SDL2 simulator.
+  * Added CMake CLI parameters (`SIM_THEME`, `SIM_ROUND`) to the simulator to quickly test different UI aesthetics and screen geometries without modifying code.
+  * Removed all trademarked terminology and imagery names from the codebase and documentation to ensure "White-label" compliance.
 * **v2.2.0** - **Functional LVGL UI.** The three themes are now actually driven, not just static mock-ups:
   * LVGL is properly pumped (2 ms tick + handler task + thread-safe lock); the panel is initialised for **ST7789 / ILI9341 / GC9A01** (previously only GC9A01 was wired and `panel_handle` didn't even link under the default ST7789 build).
   * Real **clock with SNTP** time sync; geometry is detected from the actual panel (`display_tft_is_round()`), not a hardcoded 240×240.
