@@ -10,7 +10,7 @@ This project provides a robust, production-ready foundation for VoIP intercommun
 * **HD Voice & Dynamic Codecs**: Features automatic SDP negotiation supporting both **G.722 (16 kHz HD Voice)** and standard G.711 µ-law/A-law (8 kHz) with dynamic I2S sample rate switching.
 * **Audio Pipeline & RTP**: Asynchronous I2S audio reading/writing combined with a fully implemented **Jitter Buffer**. Includes Packet Loss Concealment (PLC) via zero-stuffing to maintain I2S hardware timing during packet loss.
 * **Graphical User Interface (LVGL)**: Full Touchscreen support (ST7789/ILI9341 via SPI) and touch controllers (e.g., XPT2046) using the industry-standard LVGL library. Includes a visual dialer, active call screen, and incoming call alerts.
-* **Edge AI Voice Activation (Wake Word)**: Integrated `esp-sr` WakeNet! The intercom constantly listens locally for a Wake Word (e.g., "Alexa") to initiate a SIP call without physical interaction or cloud connectivity.
+* **Edge AI Voice Activation (Wake Word)**: Integrated `esp-sr` WakeNet! The intercom constantly listens locally for a Wake Word (e.g., "Computer") to initiate a SIP call without physical interaction or cloud connectivity.
 * **PC Simulator**: Develop and test the LVGL User Interface directly on your Windows/Mac/Linux PC using the included SDL2 Simulator, without needing to flash the ESP32!
 * **Hardware & Web Control**:
   * **Dynamic Hardware Config:** Change I2S, I2C, and SPI GPIO pins directly through the web interface without recompiling the firmware!
@@ -60,7 +60,7 @@ Once connected to Wi-Fi and registered with your SIP Server, you can control cal
 
 | Voice Assistant | Mobile OS | Smart Speaker |
 |:---:|:---:|:---:|
-| <img src="assets/theme_siri.png" width="200"/> | <img src="assets/theme_iphone.png" width="200"/> | <img src="assets/theme_echo.png" width="200"/> |
+| <img src="assets/theme_voice_assistant.png" width="200"/> | <img src="assets/theme_mobile_os.png" width="200"/> | <img src="assets/theme_smart_speaker.png" width="200"/> |
 
 ![Call UI](assets/esp32-ringing.jpg)
 
@@ -131,7 +131,7 @@ esp32_sip_client/
   * **WakeNet** ported to the esp-sr **2.x** model-loader API.
   * **Web UI:** raised HTTP handler limit, optional PIN (HTTP Basic Auth), HTML-escaped fields, captive-portal catch-all, bounds-checked rendering.
   * Added `partitions.csv` + `sdkconfig.defaults`, fixed the UTF-16 `.gitignore`.
-* **v2.0.0** - Implemented **Edge AI Voice Activation (Wake Word)**! Integrated the `esp-sr` WakeNet framework. The intercom now continuously listens to the microphone locally (offline) and automatically dials a pre-configured SIP number upon hearing the Wake Word (e.g., "Alexa").
+* **v2.0.0** - Implemented **Edge AI Voice Activation (Wake Word)**! Integrated the `esp-sr` WakeNet framework. The intercom now continuously listens to the microphone locally (offline) and automatically dials a pre-configured SIP number upon hearing the Wake Word (e.g., "Computer").
 * **v1.9.0** - Refined **Multi-Theme UI Engine**: The *Smart Speaker* theme now automatically detects screen geometry! Circular displays (e.g. GC9A01) render a **Minimalist Clock** aesthetic (clock with outer glowing ring), while rectangular displays (e.g. ST7789) render a **Dashboard** aesthetic (cards with a bottom glowing light bar).
 * **v1.8.0** - Implemented **Multi-Theme LVGL UI Engine** for circular displays (GC9A01) and traditional screens. Includes 3 dynamically switchable aesthetics via the Web UI: Voice Assistant style, Mobile OS style, and Smart Speaker style. Fully localized font mapping supporting multi-language phonebooks (including Cyrillic).
 * **v1.7.0** - Added **Dynamic Hardware Config Engine**. Change GPIO pins for I2S, SPI, and I2C via the Web Interface and store them in NVS. Flash once, configure anywhere!
