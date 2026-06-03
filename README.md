@@ -10,6 +10,7 @@ This project provides a robust, production-ready foundation for VoIP intercommun
 * **HD Voice & Dynamic Codecs**: Features automatic SDP negotiation supporting both **G.722 (16 kHz HD Voice)** and standard G.711 µ-law/A-law (8 kHz) with dynamic I2S sample rate switching.
 * **Audio Pipeline & RTP**: Asynchronous I2S audio reading/writing combined with a fully implemented **Jitter Buffer**. Includes Packet Loss Concealment (PLC) via zero-stuffing to maintain I2S hardware timing during packet loss.
 * **Graphical User Interface (LVGL)**: Full Touchscreen support (ST7789/ILI9341 via SPI) and touch controllers (e.g., XPT2046) using the industry-standard LVGL library. Includes a visual dialer, active call screen, and incoming call alerts.
+* **Edge AI Voice Activation (Wake Word)**: Integrated `esp-sr` WakeNet! The intercom constantly listens locally for a Wake Word (e.g., "Alexa") to initiate a SIP call without physical interaction or cloud connectivity.
 * **PC Simulator**: Develop and test the LVGL User Interface directly on your Windows/Mac/Linux PC using the included SDL2 Simulator, without needing to flash the ESP32!
 * **Hardware & Web Control**:
   * **Dynamic Hardware Config:** Change I2S, I2C, and SPI GPIO pins directly through the web interface without recompiling the firmware!
@@ -118,6 +119,7 @@ esp32_sip_client/
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
+* **v2.0.0** - Implemented **Edge AI Voice Activation (Wake Word)**! Integrated the `esp-sr` WakeNet framework. The intercom now continuously listens to the microphone locally (offline) and automatically dials a pre-configured SIP number upon hearing the Wake Word (e.g., "Alexa").
 * **v1.9.0** - Refined **Multi-Theme UI Engine**: The *Amazon Echo* theme now automatically detects screen geometry! Circular displays (e.g. GC9A01) render the **Echo Spot** aesthetic (clock with outer glowing ring), while rectangular displays (e.g. ST7789) render the **Echo Show 8** aesthetic (dashboard cards with a bottom glowing light bar).
 * **v1.8.0** - Implemented **Multi-Theme LVGL UI Engine** for circular displays (GC9A01) and traditional screens. Includes 3 dynamically switchable aesthetics via the Web UI: Apple Siri-inspired (Glowing Orb), iOS-style Call Screen (Glassmorphism), and Amazon Echo-inspired (Edge Ring). Fully localized font mapping supporting multi-language phonebooks (including Cyrillic).
 * **v1.7.0** - Added **Dynamic Hardware Config Engine**. Change GPIO pins for I2S, SPI, and I2C via the Web Interface and store them in NVS. Flash once, configure anywhere!
