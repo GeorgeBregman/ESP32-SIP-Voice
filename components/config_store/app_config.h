@@ -27,7 +27,10 @@
 
 // --- AI & Voice Activation ---
 #define USE_WAKE_WORD          1          // esp-sr WakeNet (needs PSRAM / S3)
-#define WAKE_WORD_MODEL        "hi_lexin"
+// Keyword must match a WakeNet model flashed into the `model` partition and
+// selectable via `idf.py menuconfig` (ESP Speech Recognition). Free options
+// include "computer", "hiesp", "hilexin", "alexa".
+#define WAKE_WORD_MODEL        "computer"
 
 // =====================================================================
 //  Audio codec selection (driven by the Kconfig hardware profile).
