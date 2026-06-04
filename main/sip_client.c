@@ -48,6 +48,7 @@ typedef struct sip_client_s {
 
     volatile bool is_registered;
     volatile sip_call_state_t call_state;
+    TickType_t invite_start_ts;
     uint32_t current_cseq;
     char current_call_id[128];
     char current_from_tag[32];
@@ -287,6 +288,7 @@ esp_err_t sip_client_initiate_call(sip_client_handle_t handle, const char* targe
     }
     strncpy(client->current_remote_uri, target_uri, sizeof(client->current_remote_uri) - 1);
     client->call_state = SIP_CALL_STATE_INVITING;
+    client->invite_start_ts = xTaskGetTickCount();
     client->negotiated_pt = -1;
     snprintf(client->current_call_id, sizeof(client->current_call_id), "%08" PRIx32 "%08" PRIx32,
              esp_random(), esp_random());
@@ -456,6 +458,17 @@ static void sip_task(void *pvParameters) {
         fd_set rf; FD_ZERO(&rf); FD_SET(client->sip_socket, &rf);
         struct timeval tv = { .tv_sec = 1, .tv_usec = 0 };
         int s = select(client->sip_socket + 1, &rf, NULL, NULL, &tv);
+
+        if (client->call_state == SIP_CALL_STATE_INVITING && client->invite_start_ts > 0) {
+            if (pdTICKS_TO_MS(xTaskGetTickCount() - client->invite_start_ts) > 32000) {
+                ESP_LOGE(TAG, "INVITE Timeout (Timer B) - No answer received");
+                client->call_state = SIP_CALL_STATE_IDLE;
+                if (client->app_callbacks.on_call_ended) {
+                    client->app_callbacks.on_call_ended(client->current_call_id);
+                }
+                client->invite_start_ts = 0;
+            }
+        }
 
         if (s < 0) {
             ESP_LOGE(TAG, "select errno %d", errno);

@@ -56,30 +56,26 @@ void app_control_task(void *pvParameters) {
         EventBits_t bits = xEventGroupWaitBits(app_event_group,
                                              WIFI_CONNECTED_BIT | SIP_REGISTERED_BIT,
                                              pdFALSE, // Don't clear on exit
-                                             pdFALSE, // Wait for ANY bit (might change based on logic)
-                                             portMAX_DELAY);
+                                             pdFALSE, // Wait for ANY bit
+                                             pdMS_TO_TICKS(500)); // Poll every 500ms
 
         if ((bits & WIFI_CONNECTED_BIT) && current_app_state < APP_STATE_SIP_REGISTERING) {
              ESP_LOGI(TAG, "Wi-Fi Connected. Starting SIP Registration.");
              current_app_state = APP_STATE_SIP_REGISTERING;
-             // Signal SIP task to start registration (if not already implicitly started)
-             if (g_sip_client) {
-                 sip_client_start_registration(g_sip_client);
-             }
+             if (g_sip_client) sip_client_start_registration(g_sip_client);
+        } else if (!(bits & WIFI_CONNECTED_BIT) && current_app_state >= APP_STATE_SIP_REGISTERING) {
+             ESP_LOGW(TAG, "Wi-Fi Lost. Downgrading state.");
+             current_app_state = APP_STATE_WIFI_CONNECTING;
+             xEventGroupClearBits(app_event_group, SIP_REGISTERED_BIT);
         }
 
         if ((bits & SIP_REGISTERED_BIT) && current_app_state < APP_STATE_IDLE) {
             ESP_LOGI(TAG, "SIP Registered. Application Idle.");
             current_app_state = APP_STATE_IDLE;
-            // Maybe trigger an LED or other indicator
         }
 
         // Add logic here to react to call state changes signaled FROM sip_client
         // e.g., if sip_client signals incoming call, update state, maybe ring a buzzer
-        // if sip_client signals call active, update state
-        // if sip_client signals call ended, return to APP_STATE_IDLE
-
-        vTaskDelay(pdMS_TO_TICKS(500)); // Check state periodically
     }
 }
 

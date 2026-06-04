@@ -69,8 +69,12 @@ typedef struct audio_pipeline_s {
     opus_decode_state_t opus_dec;
 #endif
 
+    SemaphoreHandle_t stop_ack_sem;
+
     // Working buffers
     int16_t mic_pcm[AUDIO_BUF_SAMPLES];
+    rtp_header_t rx_ph;
+    uint8_t rx_payload[RTP_MAX_PAYLOAD];
     int16_t clean_pcm[AUDIO_BUF_SAMPLES];
     int16_t play_pcm[AUDIO_BUF_SAMPLES];
     int16_t ref_pcm[AUDIO_BUF_SAMPLES];   // last played frame (AEC reference)
@@ -154,6 +158,7 @@ audio_pipeline_handle_t audio_pipeline_init(void) {
     }
     p->is_running = false;
     p->current_i2s_rate = IDLE_SAMPLE_RATE;
+    p->stop_ack_sem = xSemaphoreCreateBinary();
 
     if (i2s_init(IDLE_SAMPLE_RATE) != ESP_OK) { free(p); return NULL; }
 
@@ -245,7 +250,10 @@ esp_err_t audio_pipeline_stop(audio_pipeline_handle_t handle) {
     if (!p || !p->is_running) return ESP_ERR_INVALID_STATE;
 
     p->is_running = false;
-    vTaskDelay(pdMS_TO_TICKS(AUDIO_FRAME_MS * 2)); // let the task finish its frame
+    // Wait for the audio_io_task to acknowledge it has stopped processing
+    if (p->stop_ack_sem) {
+        xSemaphoreTake(p->stop_ack_sem, pdMS_TO_TICKS(500));
+    }
 
     if (p->rtp_session) {
         rtp_session_delete(p->rtp_session);
@@ -267,6 +275,7 @@ void audio_pipeline_delete(audio_pipeline_handle_t handle) {
     if (p->audio_io_task_handle) vTaskDelete(p->audio_io_task_handle);
     codec_deinit();
     i2s_deinit();
+    if (p->stop_ack_sem) vSemaphoreDelete(p->stop_ack_sem);
     free(p);
 }
 
@@ -286,8 +295,14 @@ static void audio_io_task(void* pv) {
 
     ESP_LOGI(TAG, "Audio I/O task started.");
 
+    bool was_running = false;
     while (1) {
         if (!p->is_running) {
+            if (was_running) {
+                // We just transitioned from running to stopped. Acknowledge stop.
+                if (p->stop_ack_sem) xSemaphoreGive(p->stop_ack_sem);
+                was_running = false;
+            }
             remote_valid = false;
             ts = 0;
             first_pkt = true;
@@ -317,6 +332,8 @@ static void audio_io_task(void* pv) {
                 remote_valid = true;
             }
         }
+
+        was_running = true;
 
         // --- Capture mic -> AEC -> encode -> send ---
         if (i2s_read(I2S_NUM, p->mic_pcm, N * sizeof(int16_t), &bytes_rw, ticks_per_frame * 2) == ESP_OK
@@ -349,12 +366,10 @@ static void audio_io_task(void* pv) {
             } while (got > 0);
 
             // --- Pull one frame from the jitter buffer -> decode -> play ---
-            rtp_header_t ph;
-            uint8_t payload[RTP_MAX_PAYLOAD];
-            int plen = rtp_jitter_buffer_get(p->rtp_session, &ph, payload, sizeof(payload));
+            int plen = rtp_jitter_buffer_get(p->rtp_session, &p->rx_ph, p->rx_payload, sizeof(p->rx_payload));
             int play_samples;
             if (plen > 0) {
-                play_samples = codec_decode(p, payload, plen, p->play_pcm);
+                play_samples = codec_decode(p, p->rx_payload, plen, p->play_pcm);
             } else {
                 // PLC / silence frame for the active codec.
                 play_samples = N;

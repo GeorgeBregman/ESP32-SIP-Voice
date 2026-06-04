@@ -144,9 +144,15 @@ static esp_err_t index_get_handler(httpd_req_t *req) {
 }
 
 static esp_err_t setup_post_handler(httpd_req_t *req) {
-    char buf[512];
-    int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
-    if (ret <= 0) return ESP_FAIL;
+    if (req->content_len > 4096) return ESP_FAIL; // Sanity limit
+    char *buf = malloc(req->content_len + 1);
+    if (!buf) return ESP_FAIL;
+
+    int ret = httpd_req_recv(req, buf, req->content_len);
+    if (ret <= 0) {
+        free(buf);
+        return ESP_FAIL;
+    }
     buf[ret] = '\0';
 
     char ssid[32] = {0}, pass[64] = {0}, sip_server[32] = {0}, sip_user[32] = {0}, sip_pass[64] = {0};
@@ -176,6 +182,7 @@ static esp_err_t setup_post_handler(httpd_req_t *req) {
     config_manager_save(g_settings);
 
     httpd_resp_send(req, "Saved. Rebooting...", HTTPD_RESP_USE_STRLEN);
+    free(buf);
     vTaskDelay(pdMS_TO_TICKS(1000));
     esp_restart();
     return ESP_OK;
@@ -281,9 +288,15 @@ static esp_err_t hardware_get_handler(httpd_req_t *req) {
 
 static esp_err_t hardware_post_handler(httpd_req_t *req) {
     if (!check_auth(req)) return ESP_OK;
-    char buf[512];
-    int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
-    if (ret <= 0) return ESP_FAIL;
+    if (req->content_len > 4096) return ESP_FAIL; // Sanity limit
+    char *buf = malloc(req->content_len + 1);
+    if (!buf) return ESP_FAIL;
+
+    int ret = httpd_req_recv(req, buf, req->content_len);
+    if (ret <= 0) {
+        free(buf);
+        return ESP_FAIL;
+    }
     buf[ret] = '\0';
 
     hardware_settings_t hw;
@@ -309,6 +322,7 @@ static esp_err_t hardware_post_handler(httpd_req_t *req) {
     config_manager_save_hw(&hw);
 
     httpd_resp_send(req, "HW Saved. Rebooting...", HTTPD_RESP_USE_STRLEN);
+    free(buf);
     vTaskDelay(pdMS_TO_TICKS(1000));
     esp_restart();
     return ESP_OK;

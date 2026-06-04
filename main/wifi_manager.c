@@ -17,6 +17,7 @@ static esp_netif_t *sta_netif = NULL;
 static esp_netif_t *ap_netif = NULL;
 static app_settings_t *g_settings = NULL;
 static bool s_is_ap_mode = false;
+static bool s_ever_connected = false;
 
 // DNS Server Task for Captive Portal
 static void dns_server_task(void *pvParameters) {
@@ -114,18 +115,26 @@ static void event_handler(void* arg, esp_event_base_t event_base,
     } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
         if (s_is_ap_mode) return;
         
-        if (s_retry_num < WIFI_MAX_RETRY) {
-            esp_wifi_connect();
-            s_retry_num++;
-            ESP_LOGI(TAG, "Retry connecting to the AP (%d/%d)", s_retry_num, WIFI_MAX_RETRY);
+        xEventGroupClearBits(s_wifi_event_group, s_connected_bit | s_ip_acquired_bit);
+
+        if (!s_ever_connected) {
+            if (s_retry_num < WIFI_MAX_RETRY) {
+                esp_wifi_connect();
+                s_retry_num++;
+                ESP_LOGI(TAG, "Retry connecting to the AP (%d/%d)", s_retry_num, WIFI_MAX_RETRY);
+            } else {
+                ESP_LOGE(TAG, "Failed to connect to the AP. Falling back to AP Mode (Captive Portal).");
+                start_ap_mode();
+            }
         } else {
-            ESP_LOGE(TAG, "Failed to connect to the AP. Falling back to AP Mode (Captive Portal).");
-            start_ap_mode();
+            esp_wifi_connect();
+            ESP_LOGI(TAG, "Connection lost. Retrying indefinitely...");
         }
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
         ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
         ESP_LOGI(TAG, "Got IP address: " IPSTR, IP2STR(&event->ip_info.ip));
         s_retry_num = 0;
+        s_ever_connected = true;
         xEventGroupSetBits(s_wifi_event_group, s_connected_bit | s_ip_acquired_bit);
     }
 }
