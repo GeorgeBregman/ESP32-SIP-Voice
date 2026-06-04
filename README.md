@@ -149,6 +149,7 @@ Windows / macOS / Linux.
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
+* **v2.2.0.2** - **Reliability & Stability Update**. Fixed `Stack Overflow` risk by moving large buffers to heap. Fixed Thread Racing in audio termination. Added Timer B (32s) for SIP `INVITE` timeouts. Implemented indefinite Wi-Fi retry logic and auto-registration recovery. Improved Web UI safety with dynamic POST buffers to prevent credential truncation.
 * **v2.2.0.1** - **Cross-Platform LVGL Simulator & Compliance Update**. 
   * Made `ui_lvgl.c` truly cross-platform by guarding ESP-IDF specific includes and functions under `#ifdef ESP_PLATFORM`. This allows the exact same UI codebase to compile natively on a PC using the SDL2 simulator.
   * Added CMake CLI parameters (`SIM_THEME`, `SIM_ROUND`) to the simulator to quickly test different UI aesthetics and screen geometries without modifying code.
