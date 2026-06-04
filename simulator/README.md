@@ -70,7 +70,14 @@ cmake --build .
 ./simulator
 ```
 
-Use your mouse to click on the screen. The mouse pointer emulates touchscreen input, allowing you to interact with the on-screen Answer/End buttons!
+The simulator starts on an **incoming call**. Your mouse emulates the touchscreen:
+click the **green** button to answer (→ active call) and the **red** button to
+hang up (→ clock face). After ~6 s idle it re-arms another incoming call so the
+demo keeps cycling.
+
+> When `SIM_ROUND=1`, the SDL window is square (240×240) so the circular themes
+> render as a true circle; otherwise it is 240×320 (rectangular). The window is
+> drawn at 2× zoom for visibility.
 
 ## License
 MIT License

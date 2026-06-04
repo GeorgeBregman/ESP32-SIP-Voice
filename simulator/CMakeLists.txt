@@ -10,6 +10,17 @@ project(lvgl_simulator C)
 add_compile_definitions(LV_CONF_INCLUDE_SIMPLE LV_DRV_CONF_INCLUDE_SIMPLE)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
 
+# Theme / geometry selectors. Made GLOBAL (and set before the libraries are
+# added) so lv_drv_conf.h — compiled as part of lv_drivers — also sees SIM_ROUND
+# and can pick a square vs rectangular SDL window.
+#   cmake .. -DSIM_THEME=2 -DSIM_ROUND=1
+if(DEFINED SIM_THEME)
+    add_compile_definitions(SIM_THEME=${SIM_THEME})
+endif()
+if(DEFINED SIM_ROUND)
+    add_compile_definitions(SIM_ROUND=${SIM_ROUND})
+endif()
+
 # Fetch LVGL and Drivers
 include(FetchContent)
 
@@ -44,15 +55,6 @@ set(SOURCES
 )
 
 add_executable(simulator ${SOURCES})
-
-# Select the UI theme / screen geometry at configure time:
-#   cmake .. -DSIM_THEME=2 -DSIM_ROUND=1
-if(SIM_THEME)
-    target_compile_definitions(simulator PRIVATE SIM_THEME=${SIM_THEME})
-endif()
-if(SIM_ROUND)
-    target_compile_definitions(simulator PRIVATE SIM_ROUND=${SIM_ROUND})
-endif()
 
 # Link libraries. (Only lvgl + lv_drivers + SDL2 — the lvgl::examples /
 # lvgl::demos targets only exist when LVGL is built with examples/demos.)
