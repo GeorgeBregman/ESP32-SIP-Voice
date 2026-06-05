@@ -22,7 +22,7 @@ idf_component_register(
         lwip
         mbedtls
         nvs_flash
-        esp_tls
+        esp-tls
         esp_wifi
         esp_event
         esp_netif
