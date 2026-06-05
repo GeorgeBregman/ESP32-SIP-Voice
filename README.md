@@ -1,5 +1,10 @@
 # ESP32-SIP-Voice Phone
 
+[![Build](https://github.com/GeorgeBregman/ESP32-SIP-Voice/actions/workflows/build.yml/badge.svg)](https://github.com/GeorgeBregman/ESP32-SIP-Voice/actions/workflows/build.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![ESP-IDF](https://img.shields.io/badge/ESP--IDF-v4.4%2B-red.svg)](https://docs.espressif.com/projects/esp-idf/)
+![Platform](https://img.shields.io/badge/platform-ESP32%20%7C%20S3%20%7C%20C3-blue.svg)
+
 A fully functional ESP32-based SIP VoIP client built on ESP-IDF and FreeRTOS. 
 
 This project provides a robust, production-ready foundation for VoIP intercommunication, doorbells, or smart home voice terminals.
@@ -185,7 +190,8 @@ Windows / macOS / Linux.
 * **v1.0.0** - Initial base template with placeholder functions and basic Wi-Fi connectivity.
 
 ## License
-MIT License
+
+Released under the [MIT License](LICENSE).
 
 ## Contact
 
