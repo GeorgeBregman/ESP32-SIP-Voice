@@ -1,6 +1,13 @@
 #ifndef APP_CONFIG_H
 #define APP_CONFIG_H
 
+// Pull in the generated build config first, so CONFIG_IDF_TARGET_* (used by the
+// target-specific GPIO pin map below) are defined regardless of the include
+// order in the file that includes us. (Absent in the PC simulator.)
+#ifdef ESP_PLATFORM
+#include "sdkconfig.h"
+#endif
+
 // =====================================================================
 //  ESP32-SIP-Voice — central configuration
 //  (Defaults below are compiled-in fallbacks; the Captive Portal / Web UI
@@ -83,7 +90,7 @@
 // --- Default GPIO pin map (compile-time fallback; overridable at runtime via
 //     the Web "HW Config" page). Pin numbers are TARGET-SPECIFIC because, e.g.,
 //     GPIO22-25 do not exist on ESP32-S3 and only GPIO0-21 exist on ESP32-C3. ---
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
+#if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(__esp32s3__)
   #define I2S_BCK_PIN        GPIO_NUM_5
   #define I2S_WS_PIN         GPIO_NUM_6
   #define I2S_DATA_OUT_PIN   GPIO_NUM_7
@@ -107,7 +114,7 @@
   #define TFT_RST  GPIO_NUM_39
   #define TOUCH_CS  GPIO_NUM_40
   #define TOUCH_IRQ GPIO_NUM_41
-#elif defined(CONFIG_IDF_TARGET_ESP32C3)
+#elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined(__esp32c3__)
   #define I2S_BCK_PIN        GPIO_NUM_4
   #define I2S_WS_PIN         GPIO_NUM_5
   #define I2S_DATA_OUT_PIN   GPIO_NUM_6
