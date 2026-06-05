@@ -1,0 +1,43 @@
+name: build
+
+# Verifies that the firmware (ESP-IDF) and the LVGL PC simulator (SDL2) both
+# actually compile — on every push/PR. No local toolchain required: everything
+# runs in GitHub-hosted runners.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # --- ESP-IDF firmware build ---
+  firmware:
+    name: esp-idf (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [esp32, esp32s3]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build for ${{ matrix.target }}
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.1.4
+          target: ${{ matrix.target }}
+          path: '.'
+
+  # --- PC simulator (LVGL + SDL2) build ---
+  simulator:
+    name: lvgl simulator (SDL2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SDL2 + build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake libsdl2-dev
+      - name: Configure & build
+        run: |
+          cmake -S simulator -B simulator/build -DSIM_THEME=2 -DSIM_ROUND=1
+          cmake --build simulator/build --parallel
