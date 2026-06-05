@@ -1,6 +1,13 @@
 #ifndef APP_CONFIG_H
 #define APP_CONFIG_H
 
+// Pull in the generated build config first, so CONFIG_IDF_TARGET_* (used by the
+// target-specific GPIO pin map below) are defined regardless of the include
+// order in the file that includes us. (Absent in the PC simulator.)
+#ifdef ESP_PLATFORM
+#include "sdkconfig.h"
+#endif
+
 // =====================================================================
 //  ESP32-SIP-Voice — central configuration
 //  (Defaults below are compiled-in fallbacks; the Captive Portal / Web UI
@@ -83,78 +90,78 @@
 // --- Default GPIO pin map (compile-time fallback; overridable at runtime via
 //     the Web "HW Config" page). Pin numbers are TARGET-SPECIFIC because, e.g.,
 //     GPIO22-25 do not exist on ESP32-S3 and only GPIO0-21 exist on ESP32-C3. ---
-#if defined(CONFIG_IDF_TARGET_ESP32S3)
-  #define I2S_BCK_PIN        GPIO_NUM_5
-  #define I2S_WS_PIN         GPIO_NUM_6
-  #define I2S_DATA_OUT_PIN   GPIO_NUM_7
-  #define I2S_DATA_IN_PIN    GPIO_NUM_4
-  #define CODEC_I2C_SCL_PIN  GPIO_NUM_8
-  #define CODEC_I2C_SDA_PIN  GPIO_NUM_9
-  #define KEYPAD_R1 GPIO_NUM_10
-  #define KEYPAD_R2 GPIO_NUM_11
-  #define KEYPAD_R3 GPIO_NUM_12
-  #define KEYPAD_R4 GPIO_NUM_13
-  #define KEYPAD_C1 GPIO_NUM_14
-  #define KEYPAD_C2 GPIO_NUM_15
-  #define KEYPAD_C3 GPIO_NUM_16
-  #define KEYPAD_C4 GPIO_NUM_17
-  #define KEYPAD_I2C_SDA GPIO_NUM_9
-  #define KEYPAD_I2C_SCL GPIO_NUM_8
-  #define TFT_MOSI GPIO_NUM_35
-  #define TFT_SCLK GPIO_NUM_36
-  #define TFT_CS   GPIO_NUM_37
-  #define TFT_DC   GPIO_NUM_38
-  #define TFT_RST  GPIO_NUM_39
-  #define TOUCH_CS  GPIO_NUM_40
-  #define TOUCH_IRQ GPIO_NUM_41
-#elif defined(CONFIG_IDF_TARGET_ESP32C3)
-  #define I2S_BCK_PIN        GPIO_NUM_4
-  #define I2S_WS_PIN         GPIO_NUM_5
-  #define I2S_DATA_OUT_PIN   GPIO_NUM_6
-  #define I2S_DATA_IN_PIN    GPIO_NUM_7
-  #define CODEC_I2C_SCL_PIN  GPIO_NUM_8
-  #define CODEC_I2C_SDA_PIN  GPIO_NUM_9
-  #define KEYPAD_R1 GPIO_NUM_0
-  #define KEYPAD_R2 GPIO_NUM_1
-  #define KEYPAD_R3 GPIO_NUM_2
-  #define KEYPAD_R4 GPIO_NUM_3
-  #define KEYPAD_C1 GPIO_NUM_10
-  #define KEYPAD_C2 GPIO_NUM_11
-  #define KEYPAD_C3 GPIO_NUM_18
-  #define KEYPAD_C4 GPIO_NUM_19
-  #define KEYPAD_I2C_SDA GPIO_NUM_9
-  #define KEYPAD_I2C_SCL GPIO_NUM_8
-  #define TFT_MOSI GPIO_NUM_6
-  #define TFT_SCLK GPIO_NUM_7
-  #define TFT_CS   GPIO_NUM_10
-  #define TFT_DC   GPIO_NUM_20
-  #define TFT_RST  GPIO_NUM_21
-  #define TOUCH_CS  GPIO_NUM_1
-  #define TOUCH_IRQ GPIO_NUM_0
+#if defined(CONFIG_IDF_TARGET_ESP32S3) || defined(__esp32s3__)
+  #define I2S_BCK_PIN        5
+  #define I2S_WS_PIN         6
+  #define I2S_DATA_OUT_PIN   7
+  #define I2S_DATA_IN_PIN    4
+  #define CODEC_I2C_SCL_PIN  8
+  #define CODEC_I2C_SDA_PIN  9
+  #define KEYPAD_R1 10
+  #define KEYPAD_R2 11
+  #define KEYPAD_R3 12
+  #define KEYPAD_R4 13
+  #define KEYPAD_C1 14
+  #define KEYPAD_C2 15
+  #define KEYPAD_C3 16
+  #define KEYPAD_C4 17
+  #define KEYPAD_I2C_SDA 9
+  #define KEYPAD_I2C_SCL 8
+  #define TFT_MOSI 35
+  #define TFT_SCLK 36
+  #define TFT_CS   37
+  #define TFT_DC   38
+  #define TFT_RST  39
+  #define TOUCH_CS  40
+  #define TOUCH_IRQ 41
+#elif defined(CONFIG_IDF_TARGET_ESP32C3) || defined(__esp32c3__)
+  #define I2S_BCK_PIN        4
+  #define I2S_WS_PIN         5
+  #define I2S_DATA_OUT_PIN   6
+  #define I2S_DATA_IN_PIN    7
+  #define CODEC_I2C_SCL_PIN  8
+  #define CODEC_I2C_SDA_PIN  9
+  #define KEYPAD_R1 0
+  #define KEYPAD_R2 1
+  #define KEYPAD_R3 2
+  #define KEYPAD_R4 3
+  #define KEYPAD_C1 10
+  #define KEYPAD_C2 11
+  #define KEYPAD_C3 18
+  #define KEYPAD_C4 19
+  #define KEYPAD_I2C_SDA 9
+  #define KEYPAD_I2C_SCL 8
+  #define TFT_MOSI 6
+  #define TFT_SCLK 7
+  #define TFT_CS   10
+  #define TFT_DC   20
+  #define TFT_RST  21
+  #define TOUCH_CS  1
+  #define TOUCH_IRQ 0
 #else // ESP32 (classic) — default WROOM/WROVER pin map
-  #define I2S_BCK_PIN        GPIO_NUM_26
-  #define I2S_WS_PIN         GPIO_NUM_25
-  #define I2S_DATA_OUT_PIN   GPIO_NUM_22
-  #define I2S_DATA_IN_PIN    GPIO_NUM_21
-  #define CODEC_I2C_SCL_PIN  GPIO_NUM_18
-  #define CODEC_I2C_SDA_PIN  GPIO_NUM_19
-  #define KEYPAD_R1 GPIO_NUM_32
-  #define KEYPAD_R2 GPIO_NUM_33
-  #define KEYPAD_R3 GPIO_NUM_27
-  #define KEYPAD_R4 GPIO_NUM_14
-  #define KEYPAD_C1 GPIO_NUM_12
-  #define KEYPAD_C2 GPIO_NUM_13
-  #define KEYPAD_C3 GPIO_NUM_4
-  #define KEYPAD_C4 GPIO_NUM_5
-  #define KEYPAD_I2C_SDA GPIO_NUM_21
-  #define KEYPAD_I2C_SCL GPIO_NUM_22
-  #define TFT_MOSI GPIO_NUM_23
-  #define TFT_SCLK GPIO_NUM_18
-  #define TFT_CS   GPIO_NUM_15
-  #define TFT_DC   GPIO_NUM_2
-  #define TFT_RST  GPIO_NUM_4
-  #define TOUCH_CS  GPIO_NUM_14
-  #define TOUCH_IRQ GPIO_NUM_27
+  #define I2S_BCK_PIN        26
+  #define I2S_WS_PIN         25
+  #define I2S_DATA_OUT_PIN   22
+  #define I2S_DATA_IN_PIN    21
+  #define CODEC_I2C_SCL_PIN  18
+  #define CODEC_I2C_SDA_PIN  19
+  #define KEYPAD_R1 32
+  #define KEYPAD_R2 33
+  #define KEYPAD_R3 27
+  #define KEYPAD_R4 14
+  #define KEYPAD_C1 12
+  #define KEYPAD_C2 13
+  #define KEYPAD_C3 4
+  #define KEYPAD_C4 5
+  #define KEYPAD_I2C_SDA 21
+  #define KEYPAD_I2C_SCL 22
+  #define TFT_MOSI 23
+  #define TFT_SCLK 18
+  #define TFT_CS   15
+  #define TFT_DC   2
+  #define TFT_RST  4
+  #define TOUCH_CS  14
+  #define TOUCH_IRQ 27
 #endif
 
 // --- Task configuration ---
@@ -177,7 +184,7 @@
 #define CTRL_METHOD_BUTTONS
 //#define CTRL_METHOD_WEB
 //#define CTRL_METHOD_AUTO
-#define BUTTON_GPIO            GPIO_NUM_0
+#define BUTTON_GPIO            0
 
 // --- Time / NTP (for the on-screen clock themes) ---
 #define NTP_SERVER             "pool.ntp.org"
