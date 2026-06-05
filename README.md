@@ -99,7 +99,7 @@ ESP32-SIP-Voice/
 ├── components/
 │   ├── config_store/        # app_config.h + NVS settings (shared; no dependency on main)
 │   ├── audio_pipeline/      # G.722 & OPUS codecs, NLMS AEC, WakeNet wake word
-│   ├── hal/                 # TFT (ST7789/ILI9341/GC9A01), XPT2046 touch, matrix keypad
+│   ├── board_hal/           # TFT (ST7789/ILI9341/GC9A01), XPT2046 touch, matrix keypad
 │   ├── storage/             # NVS phonebook / speed dial
 │   └── ui_lvgl/             # LVGL themed UI (Voice Assistant / Mobile OS / Smart Speaker)
 └── simulator/               # PC SDL2 simulator for previewing the LVGL UI

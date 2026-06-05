@@ -33,7 +33,7 @@ idf_component_register(
         # Project components (../components/*)
         config_store
         audio_pipeline
-        hal
+        board_hal
         storage
         ui_lvgl
 )
