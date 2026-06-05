@@ -1,6 +1,13 @@
 #ifndef APP_CONFIG_H
 #define APP_CONFIG_H
 
+// Pull in the generated build config first, so CONFIG_IDF_TARGET_* (used by the
+// target-specific GPIO pin map below) are defined regardless of the include
+// order in the file that includes us. (Absent in the PC simulator.)
+#ifdef ESP_PLATFORM
+#include "sdkconfig.h"
+#endif
+
 // =====================================================================
 //  ESP32-SIP-Voice — central configuration
 //  (Defaults below are compiled-in fallbacks; the Captive Portal / Web UI
