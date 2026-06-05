@@ -1,0 +1,63 @@
+name: release-firmware
+
+# Builds the firmware and attaches the flashable binaries to a GitHub Release.
+# Triggers automatically when a `v*` tag is pushed, or manually for an existing
+# tag via the Actions "Run workflow" button (workflow_dispatch).
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to attach firmware to (e.g. v2.3.0)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-attach:
+    name: firmware (${{ matrix.target }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [esp32, esp32s3]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build firmware (${{ matrix.target }})
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.1.4
+          target: ${{ matrix.target }}
+          path: '.'
+
+      - name: Package flashable binaries
+        run: |
+          set -e
+          OUT="esp32-sip-voice-${{ matrix.target }}"
+          mkdir -p "dist/$OUT"
+          # App image + bootloader + partition table + flasher args.
+          cp build/*.bin                         "dist/$OUT/" 2>/dev/null || true
+          cp build/bootloader/bootloader.bin     "dist/$OUT/" 2>/dev/null || true
+          cp build/partition_table/partition-table.bin "dist/$OUT/" 2>/dev/null || true
+          cp build/flasher_args.json             "dist/$OUT/" 2>/dev/null || true
+          cat > "dist/$OUT/FLASH.txt" <<TXT
+          Flash with esptool (offsets from flasher_args.json):
+            esptool.py -p (PORT) --chip ${{ matrix.target }} write_flash @flasher_args.json
+          or individually (typical offsets):
+            bootloader.bin        -> 0x1000 (esp32) / 0x0 (esp32s3)
+            partition-table.bin   -> 0x8000
+            esp32_sip_voice.bin   -> 0x10000
+          TXT
+          ( cd dist && zip -r "$OUT.zip" "$OUT" )
+          ls -l dist
+
+      - name: Attach to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          gh release upload "$TAG" "dist/esp32-sip-voice-${{ matrix.target }}.zip" \
+            --clobber --repo "${{ github.repository }}"
