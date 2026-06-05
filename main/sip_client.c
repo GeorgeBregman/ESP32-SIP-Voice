@@ -556,7 +556,7 @@ static void send_register(sip_client_t *client, bool initial_registration) {
         "%s"
         "Expires: %d\r\n"
         "Allow: INVITE, ACK, CANCEL, OPTIONS, BYE, INFO\r\n"
-        "User-Agent: ESP32-SIPVoice/2.1\r\n"
+        "User-Agent: ESP32-SIPVoice/2.3\r\n"
         "Content-Length: 0\r\n\r\n",
         client->domain,
         sig_ip(client), sig_port(client), branch,
@@ -660,7 +660,7 @@ static void send_invite(sip_client_t *client, const char *target_uri) {
         "Allow: INVITE, ACK, CANCEL, OPTIONS, BYE, INFO\r\n"
         "Content-Type: application/sdp\r\n"
         "%s"
-        "User-Agent: ESP32-SIPVoice/2.1\r\n"
+        "User-Agent: ESP32-SIPVoice/2.3\r\n"
         "Content-Length: %d\r\n\r\n"
         "%s",
         target_uri,
@@ -727,7 +727,7 @@ static void send_bye(sip_client_t *client) {
         "To: <%s>%s%s\r\n"
         "Call-ID: %s\r\n"
         "CSeq: %" PRIu32 " BYE\r\n"
-        "User-Agent: ESP32-SIPVoice/2.1\r\n"
+        "User-Agent: ESP32-SIPVoice/2.3\r\n"
         "Content-Length: 0\r\n\r\n",
         client->current_remote_uri,
         sig_ip(client), sig_port(client), branch,
@@ -771,7 +771,7 @@ static void send_sip_response(sip_client_t *client, int status_code, const char 
         "CSeq: %s\r\n"
         "Contact: <sip:%s@%s:%d>\r\n"
         "Allow: INVITE, ACK, CANCEL, OPTIONS, BYE, INFO\r\n"
-        "User-Agent: ESP32-SIPVoice/2.1\r\n"
+        "User-Agent: ESP32-SIPVoice/2.3\r\n"
         "%s"
         "Content-Length: %d\r\n\r\n"
         "%s",
