@@ -19,6 +19,13 @@
 
 static const char *TAG = "SIP_CLIENT";
 
+// lwip's ip_addr_get_ip4_u32 / ip_addr_set_ip4_u32 macros null-check their
+// pointer argument; passing the address of a local (`&x`) makes GCC 12 warn
+// "address will always evaluate as true" (-Werror=address). Wrapping them so
+// the macro sees a pointer *parameter* (not a constant address) avoids it.
+static uint32_t ipaddr_to_u32(ip_addr_t *a) { return ip_addr_get_ip4_u32(a); }
+static void     u32_to_ipaddr(ip_addr_t *dst, uint32_t v) { ip_addr_set_ip4_u32(dst, v); }
+
 typedef struct sip_client_s {
     EventGroupHandle_t event_group;
     EventBits_t registered_bit;
@@ -242,7 +249,7 @@ sip_client_handle_t sip_client_init(EventGroupHandle_t app_event_group, EventBit
     }
     client->server_addr.sin_family = AF_INET;
     client->server_addr.sin_port   = htons(SIP_SERVER_PORT);
-    client->server_addr.sin_addr.s_addr = ip_addr_get_ip4_u32(&target_addr);
+    client->server_addr.sin_addr.s_addr = ipaddr_to_u32(&target_addr);
 
     client->registration_timer = xTimerCreate("RegTimer",
         pdMS_TO_TICKS((uint32_t)(SIP_REGISTRATION_EXPIRY * 1000 * 0.9)),
@@ -358,9 +365,7 @@ esp_err_t sip_client_get_remote_rtp_info(sip_client_handle_t handle, ip_addr_t* 
     if (!client || !remote_ip || !remote_port || client->call_state < SIP_CALL_STATE_CONNECTING) {
         return ESP_FAIL;
     }
-    ip_addr_t tmp;
-    ip_addr_set_ip4_u32(&tmp, client->remote_rtp_addr.sin_addr.s_addr);
-    *remote_ip = tmp;
+    u32_to_ipaddr(remote_ip, client->remote_rtp_addr.sin_addr.s_addr);
     *remote_port = ntohs(client->remote_rtp_addr.sin_port);
     return ESP_OK;
 }
@@ -385,7 +390,7 @@ static void perform_stun_lookup(sip_client_t *client) {
     struct sockaddr_in dest = {0};
     dest.sin_family = AF_INET;
     dest.sin_port = htons(STUN_SERVER_PORT);
-    dest.sin_addr.s_addr = ip_addr_get_ip4_u32(&stun_addr);
+    dest.sin_addr.s_addr = ipaddr_to_u32(&stun_addr);
 
     uint8_t req[20] = { 0x00,0x01,0x00,0x00, 0x21,0x12,0xA4,0x42 };
     for (int i = 0; i < 12; i++) req[8 + i] = esp_random() & 0xFF;
@@ -938,7 +943,7 @@ static void process_incoming_sip(sip_client_t *client, char *buffer, int len, st
                     if (sdp_body && parse_sdp(client, sdp_body + 4, &rip, &rport, &pt)) {
                         client->remote_rtp_addr.sin_family = AF_INET;
                         client->remote_rtp_addr.sin_port = htons(rport);
-                        client->remote_rtp_addr.sin_addr.s_addr = ip_addr_get_ip4_u32(&rip);
+                        client->remote_rtp_addr.sin_addr.s_addr = ipaddr_to_u32(&rip);
                         client->negotiated_pt = pt;
                         client->call_state = SIP_CALL_STATE_ACTIVE;
                         send_ack(client, &client->last_remote_addr);
@@ -1011,7 +1016,7 @@ static void process_incoming_sip(sip_client_t *client, char *buffer, int len, st
             if (sdp_body && parse_sdp(client, sdp_body + 4, &rip, &rport, &pt)) {
                 client->remote_rtp_addr.sin_family = AF_INET;
                 client->remote_rtp_addr.sin_port = htons(rport);
-                client->remote_rtp_addr.sin_addr.s_addr = ip_addr_get_ip4_u32(&rip);
+                client->remote_rtp_addr.sin_addr.s_addr = ipaddr_to_u32(&rip);
                 client->negotiated_pt = pt;
                 client->call_state = SIP_CALL_STATE_INCOMING;
 
