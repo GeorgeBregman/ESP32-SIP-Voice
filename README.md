@@ -154,6 +154,14 @@ Windows / macOS / Linux.
 *   **Power Optimization:** Exploring ESP32 Deep Sleep and Wi-Fi Light Sleep modes to reduce power consumption while maintaining SIP registration for battery-powered intercoms.
 
 ## Version History
+* **v2.3.0** - **Buildable & CI-Verified Release.** The firmware now compiles cleanly end-to-end and is build-checked automatically on every push/PR (GitHub Actions). The CI matrix builds the firmware for **ESP32** and **ESP32-S3** with ESP-IDF v5.1, plus the **SDL PC simulator** — all green.
+  * Added a GitHub Actions workflow (`.github/workflows/build.yml`) that compiles firmware (esp32 / esp32s3) and the LVGL simulator.
+  * Fixed the component requirement name `esp_tls` → `esp-tls`.
+  * Renamed the custom `hal` component to `board_hal` to stop it shadowing ESP-IDF's core `hal` component (which broke mbedtls).
+  * Resolved a GCC 12 `-Werror=address` failure on lwip `ip_addr` macros in `sip_client.c`.
+  * Made the default GPIO pin map **target-aware** (ESP32 / S3 / C3) and switched it to plain integer pin numbers, fixing `GPIO_NUM_*` errors on ESP32-S3.
+  * `app_config.h` now includes `sdkconfig.h` up front so `CONFIG_IDF_TARGET_*` resolve correctly.
+  * Repo hygiene: corrected the license to **MIT** (the file was GPL), added status badges, `CONTRIBUTING.md`, and issue/PR templates.
 * **v2.2.0.2** - **Reliability & Stability Update**. Fixed `Stack Overflow` risk by moving large buffers to heap. Fixed Thread Racing in audio termination. Added Timer B (32s) for SIP `INVITE` timeouts. Implemented indefinite Wi-Fi retry logic and auto-registration recovery. Improved Web UI safety with dynamic POST buffers to prevent credential truncation.
 * **v2.2.0.1** - **Cross-Platform LVGL Simulator & Compliance Update**. 
   * Made `ui_lvgl.c` truly cross-platform by guarding ESP-IDF specific includes and functions under `#ifdef ESP_PLATFORM`. This allows the exact same UI codebase to compile natively on a PC using the SDL2 simulator.
